@@ -172,7 +172,7 @@ class ArtFightDatabase:
                        fetched_at, url
                 FROM attacks 
                 WHERE attacker_user = ? 
-                ORDER BY fetched_at DESC
+                ORDER BY fetched_at ASC
             """
             
             if limit:
@@ -216,7 +216,7 @@ class ArtFightDatabase:
                        fetched_at, url
                 FROM defenses 
                 WHERE defender_user = ? 
-                ORDER BY fetched_at DESC
+                ORDER BY fetched_at ASC
             """
             
             if limit:

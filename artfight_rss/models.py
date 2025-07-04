@@ -23,7 +23,7 @@ class ArtFightAttack(BaseModel):
         """Convert to RSS item format."""
         return {
             "title": self.title,
-            "description": self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}",
+            "description": self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}. <img src='{self.image_url}' />",
             "link": str(self.url),
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": str(self.url),
@@ -46,7 +46,7 @@ class ArtFightDefense(BaseModel):
         """Convert to RSS item format."""
         return {
             "title": self.title,
-            "description": self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}",
+            "description": self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}. <img src='{self.image_url}' />",
             "link": str(self.url),
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": str(self.url),
