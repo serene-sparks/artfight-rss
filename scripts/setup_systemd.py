@@ -104,7 +104,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths={project_root}/cache {project_root}/artfight_data.db {project_root}/venv
+ReadWritePaths={project_root}/cache {project_root}/venv
 
 [Install]
 WantedBy=multi-user.target
