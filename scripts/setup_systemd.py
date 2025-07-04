@@ -124,9 +124,9 @@ SyslogIdentifier=artfight-rss
 # Security settings
 NoNewPrivileges=yes
 PrivateTmp=yes
-#ProtectSystem=strict
+ProtectSystem=strict
 ProtectHome=yes
-#ReadWritePaths={project_root}
+ReadWritePaths={project_root}
 
 [Install]
 WantedBy=multi-user.target
