@@ -22,6 +22,7 @@ dependencies = [
     "schedule>=1.2.0",
     "requests>=2.32.4",
     "tomli>=2.0.0",
+    "brotli>=1.1.0",
 ]
 
 [project.optional-dependencies]

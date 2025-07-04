@@ -667,6 +667,7 @@ class ArtFightClient:
         progress_div = soup.find("div", class_="progress")
         if not progress_div or not isinstance(progress_div, Tag):
             logger.warning("No progress bar found for team standings")
+            logger.warning(f"HTML: {html}")
             return standings
 
         # Find all progress bars within the main progress div
