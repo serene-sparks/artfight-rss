@@ -15,17 +15,93 @@ A Python RSS service that monitors ArtFight profiles and team standings
 
 ## Installation
 
-1. Install dependencies using `uv`:
-   ```bash
-   uv sync
-   ```
+### Quick "production" Setup (Recommended)
 
-2. Copy the example configuration:
-   ```bash
-   cp config.example.toml config.toml
-   ```
+#### 1. Create a Dedicated User
+```bash
+# Create a system user for the service
+sudo useradd -r -s /bin/false artfight-rss
 
-3. Edit `config.toml` with your settings
+# Create a group (optional, will use user name as group)
+sudo groupadd artfight-rss
+```
+
+#### 2. Clone the Repository
+```bash
+# Clone to a suitable location
+sudo git clone <your-repo-url> /opt/artfight-rss
+cd /opt/artfight-rss
+
+# Set ownership to the service user
+sudo chown -R artfight-rss:artfight-rss /opt/artfight-rss
+```
+
+#### 3. Configure the Service
+```bash
+# Copy the example configuration
+sudo -u artfight-rss cp config.example.toml config.toml
+
+# Edit the configuration (as the service user)
+sudo -u artfight-rss nano config.toml
+```
+
+**Important Configuration Steps:**
+- Set your ArtFight authentication cookies (`laravel_session`, `cf_clearance`, `remember_web`)
+- Configure team colors to match ArtFight's progress bars
+- Add usernames to the whitelist (highly recommended)
+- Adjust request intervals if needed
+
+#### 4. Install as Systemd Service
+```bash
+# Run the systemd setup script
+sudo python scripts/setup_systemd.py
+```
+
+The script will:
+- Create a Python virtual environment
+- Install all dependencies
+- Create and enable the systemd service
+- Start the service automatically
+
+#### 5. Verify Installation
+```bash
+# Check service status
+sudo systemctl status artfight-rss
+
+# View logs
+sudo journalctl -u artfight-rss -f
+
+# Test the service
+curl http://localhost:8000/health
+```
+
+### Manual Installation (Development)
+
+If you prefer to run manually or for development:
+
+#### 1. Clone and Setup
+```bash
+git clone <your-repo-url>
+cd artfight-webhook
+
+# Install dependencies using uv
+uv sync
+```
+
+#### 2. Configure
+```bash
+cp config.example.toml config.toml
+# Edit config.toml with your settings
+```
+
+#### 3. Run
+```bash
+# Development
+DEBUG=1 uv run python -m artfight_rss.main
+
+# Production
+uv run uvicorn artfight_rss.main:app --host 0.0.0.0 --port 8000
+```
 
 ## Warnings
 
@@ -95,39 +171,16 @@ whitelist = [
 
 ## Usage
 
-### Development
-```bash
-DEBUG=1 uv run python -m artfight_rss.main
-```
+### Service Management (Systemd Installation)
 
-### Production
-
-#### Manual Start
-```bash
-uv run uvicorn artfight_rss.main:app --host 0.0.0.0 --port 8000
-```
-
-#### Systemd Service (Recommended)
-For production deployment, you can install the service as a systemd service:
+If you installed using the systemd setup script:
 
 ```bash
-# Create a dedicated user (optional but recommended)
-sudo useradd -r -s /bin/false artfight-rss
+# View service status
+sudo systemctl status artfight-rss
 
-# Run the setup script
-sudo python scripts/setup_systemd.py
-```
-
-The setup script will:
-- Create a systemd service file
-- Set proper permissions and ownership
-- Enable and start the service
-- Configure automatic restarts
-
-**Service Management:**
-```bash
 # View logs
-journalctl -u artfight-rss -f
+sudo journalctl -u artfight-rss -f
 
 # Stop service
 sudo systemctl stop artfight-rss
@@ -138,8 +191,35 @@ sudo systemctl start artfight-rss
 # Restart service
 sudo systemctl restart artfight-rss
 
-# Disable service
+# Disable service (won't start on boot)
 sudo systemctl disable artfight-rss
+
+# Enable service (will start on boot)
+sudo systemctl enable artfight-rss
+```
+
+### Manual Usage (Development)
+
+For development or manual installation:
+
+```bash
+# Development mode with debug logging
+DEBUG=1 uv run python -m artfight_rss.main
+
+# Production mode
+uv run uvicorn artfight_rss.main:app --host 0.0.0.0 --port 8000
+```
+
+### Updating the Service
+
+To update dependencies or the application:
+
+```bash
+# Update dependencies (systemd installation)
+sudo -u artfight-rss /opt/artfight-rss/venv/bin/pip install -e /opt/artfight-rss --upgrade
+
+# Restart the service
+sudo systemctl restart artfight-rss
 ```
 
 ## API Endpoints
@@ -264,6 +344,54 @@ docker run -d \
   -v $(pwd)/cache:/app/cache \
   artfight-rss
 ``` 
+
+## Troubleshooting
+
+### Common Issues
+
+#### Service Won't Start
+```bash
+# Check service status
+sudo systemctl status artfight-rss
+
+# View detailed logs
+sudo journalctl -u artfight-rss -n 50
+
+# Check if config.toml exists and is readable
+sudo -u artfight-rss test -r /opt/artfight-rss/config.toml && echo "Config OK" || echo "Config missing/unreadable"
+```
+
+#### Authentication Issues
+- Ensure all required cookies are set in `config.toml`
+- Check `/auth/status` endpoint: `curl http://localhost:8000/auth/status`
+- Cookies may expire - refresh them from your browser
+
+#### Permission Issues
+```bash
+# Fix ownership
+sudo chown -R artfight-rss:artfight-rss /opt/artfight-rss
+
+# Fix permissions
+sudo chmod 755 /opt/artfight-rss
+sudo chmod 755 /opt/artfight-rss/cache
+```
+
+#### RSS Feed Issues
+- Verify usernames are in the whitelist
+- Check service is running: `curl http://localhost:8000/health`
+- Test RSS feed directly: `curl http://localhost:8000/rss/username/attacks`
+
+#### Team Standings Issues
+- Verify team colors match ArtFight's progress bars exactly
+- Check both teams are configured in `config.toml`
+- Monitor team checking: `curl http://localhost:8000/stats`
+
+### Getting Help
+
+1. **Check the logs**: `sudo journalctl -u artfight-rss -f`
+2. **Verify configuration**: Ensure `config.toml` is properly formatted
+3. **Test endpoints**: Use `curl` to test individual endpoints
+4. **Check ArtFight**: Verify the website structure hasn't changed
 
 ## AI Disclosures
 This project was made with heavy assistance from AI. This can be very controvertial in art spaces and I want to clarify why I decided to go this route.
