@@ -114,8 +114,8 @@ class RSSFeed(BaseModel):
         for item in self.items:
             items_xml += f"""
             <item>
-                <title>{xml.sax.saxutils.escape(item['title'])}</title>
-                <description>{xml.sax.saxutils.escape(item['description'])}</description>
+                <title>{html.escape(item['title'])}</title>
+                <description>{html.escape(item['description'])}</description>
                 <link>{item['link']}</link>
                 <pubDate>{item['fetchDate']}</pubDate>
                 <guid>{item['guid']}</guid>
@@ -125,8 +125,8 @@ class RSSFeed(BaseModel):
         return f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
     <channel>
-        <title>{xml.sax.saxutils.escape(self.title)}</title>
-        <description>{xml.sax.saxutils.escape(self.description)}</description>
+        <title>{html.escape(self.title)}</title>
+        <description>{html.escape(self.description)}</description>
         <link>{self.link}</link>
         <lastBuildDate>{self.last_updated.strftime('%a, %d %b %Y %H:%M:%S +0000')}</lastBuildDate>
         {items_xml}
