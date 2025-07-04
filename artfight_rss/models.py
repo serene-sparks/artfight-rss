@@ -21,8 +21,8 @@ class ArtFightAttack(BaseModel):
     def to_rss_item(self) -> dict:
         """Convert to RSS item format."""
         return {
-            "title": html.escape(self.title),
-            "description": html.escape(self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}"),
+            "title": self.title,
+            "description": self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}",
             "link": str(self.url),
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": str(self.url),
@@ -44,8 +44,8 @@ class ArtFightDefense(BaseModel):
     def to_rss_item(self) -> dict:
         """Convert to RSS item format."""
         return {
-            "title": html.escape(self.title),
-            "description": html.escape(self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}"),
+            "title": self.title,
+            "description": self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}",
             "link": str(self.url),
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": str(self.url),
@@ -76,8 +76,8 @@ class TeamStanding(BaseModel):
         else:
             title = "Team Standings Update"
         return {
-            "title": html.escape(title),
-            "description": html.escape(f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%"),
+            "title": title,
+            "description": f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%",
             "link": "https://artfight.net/teams",
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": f"team-standings-{self.fetched_at.strftime('%Y%m%d%H%M%S')}",

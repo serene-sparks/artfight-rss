@@ -1,5 +1,6 @@
 """ArtFight API client for scraping profile data and team standings."""
 
+import html
 import logging
 import re
 from datetime import datetime, timedelta
@@ -534,10 +535,11 @@ class ArtFightClient:
             # Can be misleading: popper moves the data to data-original-title in a browser
             title = None
             if img_elem and img_elem.get("title"):
-                title = img_elem["title"]
+                title = html.unescape(img_elem["title"])
             if not title:
                 # Fallback: use alt attribute or default
-                title = img_elem.get("alt") if img_elem and img_elem.get("alt") else f"Untitled {'Defense' if is_defense else 'Attack'}"
+                alt_text = img_elem.get("alt") if img_elem and img_elem.get("alt") else f"Untitled {'Defense' if is_defense else 'Attack'}"
+                title = html.unescape(alt_text)
 
             # TODO: load from the attack page
             description = None
