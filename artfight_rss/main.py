@@ -90,7 +90,7 @@ async def get_stats():
     return monitor.get_stats()
 
 
-@app.get("/rss/{username}/attacks")
+@app.get("/rss/user/{username}/attacks")
 async def get_user_rss(username: str):
     """Get RSS feed for a user's attacks."""
     # Check if user is in whitelist

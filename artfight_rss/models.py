@@ -82,6 +82,7 @@ class TeamStanding(BaseModel):
             "link": "https://artfight.net/teams",
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": f"team-standings-{self.fetched_at.strftime('%Y%m%d%H%M%S')}",
+            "isPermaLink": False,
         }
 
 
@@ -112,13 +113,15 @@ class RSSFeed(BaseModel):
         """Convert to RSS XML format."""
         items_xml = ""
         for item in self.items:
+            # Handle isPermaLink attribute for guid
+            guid_attr = ' isPermaLink="false"' if item.get('isPermaLink') is False else ""
             items_xml += f"""
             <item>
                 <title>{html.escape(item['title'])}</title>
                 <description>{html.escape(item['description'])}</description>
                 <link>{item['link']}</link>
                 <pubDate>{item['fetchDate']}</pubDate>
-                <guid>{item['guid']}</guid>
+                <guid{guid_attr}>{item['guid']}</guid>
             </item>
             """
 
