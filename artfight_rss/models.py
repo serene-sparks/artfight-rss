@@ -79,6 +79,7 @@ class TeamStanding(BaseModel):
         if self.leader_change:
             leader = team1_name if self.team1_percentage > 50 else team2_name
             title = f"Leader Change: {leader} takes the lead!"
+            description = f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%. <img src='{leader_image}' />"
         else:
             title = "Team Standings Update"
             description = f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%. <img src='{leader_image}' />"

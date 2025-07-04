@@ -45,6 +45,28 @@ def get_user_input(prompt: str, default: Optional[str] = None) -> str:
     else:
         return input(f"{prompt}: ").strip()
 
+def read_config_value(config_file: Path, key: str, default: str) -> str:
+    """Read a value from config.toml using simple parsing."""
+    if not config_file.exists():
+        return default
+    
+    try:
+        with open(config_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(key) and "=" in line:
+                    # Extract the value after the equals sign
+                    value = line.split("=", 1)[1].strip()
+                    # Remove quotes if present
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1]
+                    elif value.startswith("'") and value.endswith("'"):
+                        value = value[1:-1]
+                    return value
+        return default
+    except Exception:
+        return default
+
 def create_venv(project_root: Path, user: str, group: str):
     """Create a Python virtual environment."""
     venv_path = project_root / "venv"
@@ -79,7 +101,7 @@ def install_dependencies(pip_path: Path, project_root: Path, user: str, group: s
     
     print("✅ Dependencies installed")
 
-def create_systemd_service(project_root: Path, user: str, group: str, port: int, python_path: Path):
+def create_systemd_service(project_root: Path, user: str, group: str, host: str, port: int, python_path: Path):
     """Create the systemd service file."""
     service_content = f"""[Unit]
 Description=ArtFight RSS Service
@@ -92,7 +114,7 @@ User={user}
 Group={group}
 WorkingDirectory={project_root}
 Environment=PYTHONPATH={project_root}
-ExecStart={python_path} -m uvicorn artfight_rss.main:app --host 0.0.0.0 --port {port}
+ExecStart={python_path} -m uvicorn artfight_rss.main:app --host {host} --port {port}
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -100,11 +122,11 @@ StandardError=journal
 SyslogIdentifier=artfight-rss
 
 # Security settings
-NoNewPrivileges=true
-PrivateTmp=true
+NoNewPrivileges=yes
+PrivateTmp=yes
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths={project_root}/data {project_root}/cache {project_root}/venv
+ProtectHome=yes
+ReadWritePaths={project_root}
 
 [Install]
 WantedBy=multi-user.target
@@ -243,11 +265,22 @@ def main():
         print("   This script requires a pyproject.toml file for dependency installation.")
         sys.exit(1)
     
+    # Read host and port from config file
+    config_file = project_root / "config.toml"
+    default_host = read_config_value(config_file, "host", "0.0.0.0")
+    default_port = read_config_value(config_file, "port", "8000")
+    
     # Get user input
     print("\n📝 Configuration:")
     user = get_user_input("Service user", "artfight-rss")
     group = get_user_input("Service group", user)
-    port = get_user_input("Service port", "8000")
+    host = get_user_input("Service host", default_host)
+    port = get_user_input("Service port", default_port)
+    
+    # Validate host
+    if not host or host.strip() == "":
+        print("❌ Host cannot be empty.")
+        sys.exit(1)
     
     # Validate port
     try:
@@ -277,6 +310,7 @@ def main():
     print(f"\n✅ Configuration validated:")
     print(f"   User: {user}")
     print(f"   Group: {group}")
+    print(f"   Host: {host}")
     print(f"   Port: {port}")
     
     # Confirm installation
@@ -286,7 +320,7 @@ def main():
     print(f"   - Create systemd service: /etc/systemd/system/artfight-rss.service")
     print(f"   - Set ownership of {project_root} to {user}:{group}")
     print(f"   - Enable and start the service")
-    print(f"   - The service will run on port {port}")
+    print(f"   - The service will run on {host}:{port}")
     
     confirm = input("\nContinue? (y/N): ").strip().lower()
     if confirm not in ['y', 'yes']:
@@ -309,7 +343,7 @@ def main():
             sys.exit(1)
         
         # Create systemd service
-        create_systemd_service(project_root, user, group, port_int, python_path)
+        create_systemd_service(project_root, user, group, host, port_int, python_path)
         
         # Enable and start service
         enable_and_start_service()
@@ -318,11 +352,11 @@ def main():
         check_service_status()
         
         print("\n🎉 ArtFight RSS Service has been successfully installed as a systemd service!")
-        print(f"   The service is now running on http://localhost:{port}")
+        print(f"   The service is now running on http://{host}:{port}")
         print(f"   RSS feeds will be available at:")
-        print(f"   - http://localhost:{port}/rss/username/attacks")
-        print(f"   - http://localhost:{port}/rss/username/defenses")
-        print(f"   - http://localhost:{port}/rss/standings")
+        print(f"   - http://{host}:{port}/rss/username/attacks")
+        print(f"   - http://{host}:{port}/rss/username/defenses")
+        print(f"   - http://{host}:{port}/rss/standings")
         print(f"\n📁 Virtual environment: {project_root}/venv")
         print(f"   To update dependencies: sudo -u {user} {pip_path} install -e {project_root} --upgrade")
         
