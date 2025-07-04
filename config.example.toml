@@ -1,0 +1,33 @@
+# ArtFight RSS Service Configuration
+
+# General settings
+request_interval_sec = 300  # Minimum seconds between requests to ArtFight (5 minutes)
+team_check_interval_sec = 30  # How often to check team standings (30 minutes)
+team_switch_threshold_sec = 24  # Hours since last switch before forcing update
+
+# ArtFight settings
+artfight_base_url = "https://artfight.net"
+
+# Authentication settings
+laravel_session = ""
+cf_clearance = ""
+remember_web = ""
+
+# Server settings
+host = "0.0.0.0"
+port = 8000
+debug = false
+
+# Whitelist of supported ArtFight profiles (optional)
+# If empty, all profiles are allowed
+whitelist = [
+    "example_user"
+]
+
+# Team configuration
+# Define the two teams with their colors from the progress bars
+# if the colors are not set, the first bar will be used as team1
+# but this is not recommended as the first bar may not be the correct team
+[teams]
+team1 = { name = "Fossils", color = "#BA8C25" }  # Gold/Orange color from progress bar
+team2 = { name = "Crystals", color = "#D35E88" }   # Pink/Magenta color from progress bar 

@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Art Fight -  fourleafisland's Defenses </title>
+    
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+
+    <meta property="og:title" content="Art Fight">
+    <meta property="og:description" content="An art gifting game">
+    <meta property="og:image" content="https://artfight.net/images/default_banner.jpg">
+    <meta property="og:url" content="https://artfight.net">
+
+    <meta property="twitter:title" content="Art Fight">
+    <meta property="twitter:description" content="An art gifting game">
+    <meta property="twitter:image" content="https://artfight.net/images/default_banner.jpg">
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:site" content="@theartfight" />
+    <meta property="twitter:creator" content="@theartfight" />
+
+    <meta name="robots" content="noai, noimageai">
+    <meta name="pinterest" content="nopin" />
+
+    <script nonce="a214d6b25535789f871d9f1e4ee5c9fe" src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+    <link rel="icon" href="https://artfight.net/favicon.ico">
+    <script nonce="a214d6b25535789f871d9f1e4ee5c9fe" src="/js/all.js?id=b3b7a6e6c2b97ee309f19620926aa89d"></script>
+
+            <link rel="stylesheet" href="/css/all-dark.css?id=cf7bc467c24a53acd1f71cfd7ccf777f" />
+    
+        <style type="text/css">@font-face {font-family:Roboto;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto/5.0.11/latin-ext/400/normal.woff2);unicode-range:U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;font-display:swap;}@font-face {font-family:Roboto;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto/5.0.11/vietnamese/400/normal.woff2);unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;font-display:swap;}@font-face {font-family:Roboto;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto/5.0.11/cyrillic/400/normal.woff2);unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;font-display:swap;}@font-face {font-family:Roboto;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto/5.0.11/cyrillic-ext/400/normal.woff2);unicode-range:U+0460-052F,U+1C80-1C88,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F;font-display:swap;}@font-face {font-family:Roboto;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto/5.0.11/greek-ext/400/normal.woff2);unicode-range:U+1F00-1FFF;font-display:swap;}@font-face {font-family:Roboto;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto/5.0.11/latin/400/normal.woff2);unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;font-display:swap;}@font-face {font-family:Roboto;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto/5.0.11/greek/400/normal.woff2);unicode-range:U+0370-03FF;font-display:swap;}@font-face {font-family:Roboto Condensed;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto-condensed/5.0.14/greek-ext/400/normal.woff2);unicode-range:U+1F00-1FFF;font-display:swap;}@font-face {font-family:Roboto Condensed;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto-condensed/5.0.14/vietnamese/400/normal.woff2);unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;font-display:swap;}@font-face {font-family:Roboto Condensed;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto-condensed/5.0.14/latin/400/normal.woff2);unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;font-display:swap;}@font-face {font-family:Roboto Condensed;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto-condensed/5.0.14/latin-ext/400/normal.woff2);unicode-range:U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;font-display:swap;}@font-face {font-family:Roboto Condensed;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto-condensed/5.0.14/cyrillic/400/normal.woff2);unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;font-display:swap;}@font-face {font-family:Roboto Condensed;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto-condensed/5.0.14/cyrillic-ext/400/normal.woff2);unicode-range:U+0460-052F,U+1C80-1C88,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F;font-display:swap;}@font-face {font-family:Roboto Condensed;font-style:normal;font-weight:400;src:url(/cf-fonts/s/roboto-condensed/5.0.14/greek/400/normal.woff2);unicode-range:U+0370-03FF;font-display:swap;}</style>
+    
+<style>
+    
+</style>
+    <style >[wire\:loading], [wire\:loading\.delay], [wire\:loading\.inline-block], [wire\:loading\.inline], [wire\:loading\.block], [wire\:loading\.flex], [wire\:loading\.table], [wire\:loading\.grid], [wire\:loading\.inline-flex] {display: none;}[wire\:loading\.delay\.shortest], [wire\:loading\.delay\.shorter], [wire\:loading\.delay\.short], [wire\:loading\.delay\.long], [wire\:loading\.delay\.longer], [wire\:loading\.delay\.longest] {display:none;}[wire\:offline] {display: none;}[wire\:dirty]:not(textarea):not(input):not(select) {display: none;}input:-webkit-autofill, select:-webkit-autofill, textarea:-webkit-autofill {animation-duration: 50000s;animation-name: livewireautofill;}@keyframes livewireautofill { from {} }</style>
+</head>
+
+<body>
+        
+    <div id="wrapper">
+        <!-- Google Analytics -->
+<script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-37994168-4', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+<!-- Static navbar -->
+<nav class="artfight-nav navbar navbar-dark navbar-static-top navbar-expand-md mb-0">
+  <a class="navbar-brand d-flex align-items-center p-0" href="/">
+    <img class="w-25 mr-2" style="min-width: 20px;" src="https://artfight.net/images/logo40.png"></img>
+    <div class="w-75">ART FIGHT</div>
+  </a>
+  <button class="navbar-toggler collapsed" type="button" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="navbar-collapse collapse flex-wrap" id="navbar">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item mr-3"><a class="nav-link" href="https://discord.gg/artfight"><i class="fab fa-discord"></i> Discord </a></li>
+      <li class="nav-item dropdown mr-3">
+        <a class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-aspopup="true" aria-expanded="false"><i class="fas fa-question-square"></i> Help</a>
+        <div class="dropdown-menu">
+          <div class="dropdown-header">INFO</div>
+          <a class="dropdown-item" href="https://artfight.net/info/about">About</a>
+          <a class="dropdown-item" href="https://artfight.net/info/rules">Rules</a>
+          <a class="dropdown-item" href="https://artfight.net/info/faq">FAQ</a>
+          <a class="dropdown-item" href="https://artfight.net/info/changelog">Changelog</a>
+          <a class="dropdown-item" href="https://artfight.net/info/art-assets">Art Assets</a>
+          <div role="separator" class="dropdown-divider"></div>
+          <div class="dropdown-header">GUIDES</div>
+          <a class="dropdown-item" href="https://artfight.net/info/guide-attacks">Attack Categorization</a>
+          <a class="dropdown-item" href="https://artfight.net/info/guide-filters">Filtering Guide</a>
+          <a class="dropdown-item" href="https://artfight.net/info/guide-bbcode">BBCode</a>
+          <div role="separator" class="dropdown-divider"></div>
+          <a class="dropdown-item" href="https://artfight.net/news">News</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown mr-3">
+        <a class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-aspopup="true" aria-expanded="false"><i class="fas fa-shopping-cart"></i> Shop<!--<span class="badge badge-anim badge-pill badge-primary ml-1">new!</span>--></a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" href="https://artfight.net/donate">Support Art Fight</a>
+          <hr class="mt-2 mb-1" />
+          <a class="dropdown-item" href="https://shop.artfight.net/" target="_blank">Merch</a>
+        </div>
+      </li>
+            <li class="nav-item dropdown mr-3">
+        <a class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-aspopup="true" aria-expanded="false">
+          <i class="fas fa-compass"></i> Discover <div class="badge badge-info ml-1">new</div>
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" href="https://artfight.net/discovery">Discovery Home</a>
+          <div role="separator" class="dropdown-divider"></div>
+          
+          <div class="dropdown-header">SEARCH <div class="badge badge-info ml-1">new</div></div>
+          <a class="dropdown-item" href="https://artfight.net/discovery/search-users">Users</a>
+          <a class="dropdown-item" href="https://artfight.net/discovery/search-characters">Characters</a>
+          <a class="dropdown-item" href="https://artfight.net/discovery/search-attacks">Attacks</a>
+          <div role="separator" class="dropdown-divider"></div>
+                      <a class="dropdown-item" href="https://artfight.net/rate">Rate Attacks</a>
+            <div role="separator" class="dropdown-divider"></div>
+                    <div class="dropdown-header">BROWSE <div class="badge badge-secondary ml-1">old</div></div>
+          <a class="dropdown-item" href="https://artfight.net/members">Members</a>
+          <a class="dropdown-item" href="https://artfight.net/browse/attacks">Attacks</a>
+          <a class="dropdown-item" href="https://artfight.net/browse/characters">Characters</a>
+          <a class="dropdown-item" href="https://artfight.net/character/random">Random Character</a>
+          <a class="dropdown-item" href="https://artfight.net/user/random">Random User</a>
+          <a class="dropdown-item" href="https://artfight.net/browse/tags">
+            Tag Search
+          </a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" data-toggle="dropdown" role="button" aria-aspopup="true" aria-expanded="false"><i class="fas fa-plus"></i> Submit</a>
+        <div class="dropdown-menu">
+                      <a class="dropdown-item" href="https://artfight.net/submit/attack">Attack!</a>
+                    <a class="dropdown-item" href="https://artfight.net/submit/character">Character</a>
+        </div>
+      </li>
+          </ul>
+
+    <hr role="separator" class="d-block d-sm-none dropdown-divider element-disabled">
+
+    <ul class="navbar-nav ml-auto">
+                            <li class="nav-item mr-3"><a class="nav-link" href="/team/21.fossils">Team Fossils</a></li>
+                <li class="nav-item dropdown">
+           <a href="https://artfight.net/~Serene_Sparks_" class="nav-link username-navbar">
+               <strong><span style="color: #ba8c25;"> Serene_Sparks_</span></strong>
+           </a>
+           <a href="https://artfight.net/~Serene_Sparks_" class="nav-link dropdown-toggle avatar-dropdown" data-toggle="dropdown" role="button" aria-aspopup="true" aria-expanded="false">
+               <div class="d-none d-md-inline-block navbar-icon" style="background-image: url(https://images.artfight.net/avatar/1118/1118659.png?t=1751568864);">
+                                  </div>
+                          </a>
+          <div class="dropdown-menu">
+            <a class="dropdown-item" href="https://artfight.net/~Serene_Sparks_">Profile</a>
+            <a class="dropdown-item" href="https://artfight.net/user/settings">Settings</a>
+            <a class="dropdown-item" href="https://artfight.net/team/sort">Team Settings</a>
+            <a class="dropdown-item" href="https://artfight.net/reports">Reports</a>
+            <div role="separator" class="dropdown-divider"></div>
+            <div class="dropdown-header">MANAGE</div>
+            <a class="dropdown-item" href="https://artfight.net/manage/characters">Characters</a>
+            <a class="dropdown-item" href="https://artfight.net/manage/bookmarks/folders">Bookmarks</a>
+            <a class="dropdown-item" href="https://artfight.net/manage/attacks">Attacks</a>
+            <a class="dropdown-item" href="https://artfight.net/manage/achievements">Achievements</a>
+            <div role="separator" class="dropdown-divider"></div>
+            <div class="dropdown-header">MESSAGES</div>
+            <a class="dropdown-item pr-2" href="https://artfight.net/messages">
+              <div class="d-flex align-items-center">Messages </div>
+            </a>
+            <a class="dropdown-item pr-2" href="https://artfight.net/attacks">
+              <div class="d-flex align-items-center">Attacks </div>
+            </a>
+            <a class="dropdown-item pr-2" href="https://artfight.net/notifications">
+              <div class="d-flex align-items-center">Notifications </div>
+            </a>
+            <a class="dropdown-item pr-2" href="https://artfight.net/subscriptions">
+              <div class="d-flex align-items-center">
+                <span class="mr-2">Subscriptions</span>
+                                  <span class="badge badge-info badge-pill ml-auto">new</span>
+                              </div>
+            </a>
+            <div role="separator" class="dropdown-divider"></div>
+            <form method="POST" action="https://artfight.net/logout" accept-charset="UTF-8"><input name="_token" type="hidden" value="7Clqj2VzYD2NhACJxwAT8EClFCKrrJq286MHvI0F">
+              <input class="dropdown-item" type="submit" value="Logout">
+            </form>
+          </div>
+        </li>
+          </ul>
+  </div><!--/.nav-collapse -->
+</nav>
+                    <div class="banner-container mb-3">
+                                    <a href="/"><div class="banner" style="background-image: url(https://images.artfight.net/banners/Crystal_1.jpg);"></div></a>
+                </div>
+                <div id="content">
+                <div class="container-fluid">
+                                                                                        
+    <div class="profile-header-wrapper clearfix">
+    <div class="panel panel-default profile-header"> 
+        <div class="profile-header-background panel-heading bg-light p-2 border rounded position-relative">
+            <!-- Normal -->
+            <div class="d-none d-md-block profile-normal-header">
+                <div class="card panel float-left d-none d-md-block profile-avatar-wrapper" style="margin-right:20px;">
+                    <div class="card-body panel-body profile-avatar-panel">
+                        <a class="d-flex justify-content-center" href="/~fourleafisland"><span class="icon-user" style="border-color: #ba8c25;background-image: url(https://images.artfight.net/avatar/181/181965.png?t=1751566171);" /></span></a>
+                                            </div>
+                </div>
+                <span class="h2 profile-header-name">
+                  <strong><a href="/~fourleafisland" style="color: #ba8c25;"><span class="fas fa-heart"></span> fourleafisland</a></strong>
+                  <small class="element-disabled text-muted h5 copy-text" data-toggle="tooltip" title="Click to Copy"><i class="fas fa-clipboard"></i></small>
+                  <small class="element-disabled text-muted h5">User</small>
+                                        <small class="element-disabled text-muted h5">- Premium</small>
+                                                    </span>
+                <div class="float-right profile-header-buttons">
+                    
+                                            
+                                                   <span class="profile-header-button d-inline">
+                               <form method="POST" action="https://artfight.net/user/follow/181965" accept-charset="UTF-8" style="display: inline-block;"><input name="_token" type="hidden" value="7Clqj2VzYD2NhACJxwAT8EClFCKrrJq286MHvI0F">
+                               <input class="btn btn-warning" type="submit" value="Unfollow">
+                               </form>
+                           </span>
+                           <span class="profile-header-button d-inline">
+                              <a href="https://artfight.net/messages/new/fourleafisland" class="btn btn-primary">
+                                  <i class="far fa-envelope"></i>
+                                  PM
+                              </a>
+                           </span>
+                                                <span class="profile-header-button d-inline">
+                           <a href="#" class="btn btn-danger report-button" data-id="181965" data-type="user" data-toggle="modal" data-target="#modal"><i class="far fa-exclamation-triangle" aria-hidden="true"></i> Report</a>
+                        </span>
+                                        <span class="profile-header-button d-inline">
+                        <div class="dropdown d-inline-block">
+  <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="profile-dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+    <i class="fal fa-bars"></i>
+  </a>
+
+  <div class="dropdown-menu dropdown-menu-right" aria-labeledby="profile-dropdown">
+
+    <a wire:id="mOGFipVcrGR9Q311Wnys" wire:initial-data="{&quot;fingerprint&quot;:{&quot;id&quot;:&quot;mOGFipVcrGR9Q311Wnys&quot;,&quot;name&quot;:&quot;css-toggle&quot;,&quot;locale&quot;:&quot;en&quot;,&quot;path&quot;:&quot;~fourleafisland\/defenses&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;v&quot;:&quot;acj&quot;},&quot;effects&quot;:{&quot;listeners&quot;:[]},&quot;serverMemo&quot;:{&quot;children&quot;:[],&quot;errors&quot;:[],&quot;htmlHash&quot;:&quot;ab8a32dc&quot;,&quot;data&quot;:{&quot;user&quot;:[]},&quot;dataMeta&quot;:{&quot;models&quot;:{&quot;user&quot;:{&quot;class&quot;:&quot;App\\Models\\User&quot;,&quot;id&quot;:181965,&quot;relations&quot;:[],&quot;connection&quot;:&quot;mysql&quot;,&quot;collectionClass&quot;:null}}},&quot;checksum&quot;:&quot;cd1e26926315d071a867d9463e3a822dc26af8affdd06be7cc0124ae9a121140&quot;}}" wire:click="toggle" href="#" class="dropdown-item">
+    
+            <i class="far fa-eye-slash"></i> Hide Theme
+    </a>
+
+<!-- Livewire Component wire-end:mOGFipVcrGR9Q311Wnys -->
+          <div class="dropdown-divider"></div>
+              <a href="#" class="block-button dropdown-item" data-id="181965" data-type="user" data-toggle="modal" data-target="#modal">
+          <i class="fas fa-ban" aria-hidden="true"></i>
+          Block
+        </a>
+            </div>
+</div>
+                    </span>
+                </div>
+            </div>
+            <!-- End normal -->
+            <!-- Mobile -->
+            <div class="d-block d-md-none profile-mobile-header">
+                <div class="card profile-avatar-wrapper">
+                    <div class="card-body text-center">
+                        <a class="d-flex justify-content-center" href="/~fourleafisland"><span class="icon-user" style="border-color: #ba8c25;background-image: url(https://images.artfight.net/avatar/181/181965.png?t=1751566171);" /></span></a>
+                                            </div>
+                </div>
+                <p class="h2 profile-header-name text-center mt-2 mb-0">
+                    <strong><a href="/~fourleafisland" style="color: #ba8c25;"><span class="fas fa-heart"></span> fourleafisland</a></strong>
+                </p>
+                <p class="h3 profile-header-name text-center">
+                  <small class="element-disabled">User</small>
+                                        <small class="element-disabled text-muted">- Premium</small>
+                                                    </p>
+                <div class="profile-header-buttons text-right">
+                    
+                                            
+                                                   <span class="profile-header-button d-inline">
+                               <form method="POST" action="https://artfight.net/user/follow/181965" accept-charset="UTF-8" style="display: inline-block;"><input name="_token" type="hidden" value="7Clqj2VzYD2NhACJxwAT8EClFCKrrJq286MHvI0F">
+                               <input class="btn btn-warning" type="submit" value="Unfollow">
+                               </form>
+                           </span>
+                           <span class="profile-header-button d-inline">
+                              <a href="https://artfight.net/messages/new/fourleafisland" class="btn btn-primary">
+                                  <i class="far fa-envelope"></i>
+                                  PM
+                              </a>
+                           </span>
+                                                <span class="profile-header-button d-inline">
+                           <a href="#" class="btn btn-danger report-button" data-id="181965" data-type="user" data-toggle="modal" data-target="#modal"><i class="far fa-exclamation-triangle" aria-hidden="true"></i> Report</a>
+                        </span>
+                                        <span class="profile-header-button d-inline">
+                        <div class="dropdown d-inline-block">
+  <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="profile-dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+    <i class="fal fa-bars"></i>
+  </a>
+
+  <div class="dropdown-menu dropdown-menu-right" aria-labeledby="profile-dropdown">
+
+    <a wire:id="3crF9UGhFTgh5VAmvmHY" wire:initial-data="{&quot;fingerprint&quot;:{&quot;id&quot;:&quot;3crF9UGhFTgh5VAmvmHY&quot;,&quot;name&quot;:&quot;css-toggle&quot;,&quot;locale&quot;:&quot;en&quot;,&quot;path&quot;:&quot;~fourleafisland\/defenses&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;v&quot;:&quot;acj&quot;},&quot;effects&quot;:{&quot;listeners&quot;:[]},&quot;serverMemo&quot;:{&quot;children&quot;:[],&quot;errors&quot;:[],&quot;htmlHash&quot;:&quot;ab8a32dc&quot;,&quot;data&quot;:{&quot;user&quot;:[]},&quot;dataMeta&quot;:{&quot;models&quot;:{&quot;user&quot;:{&quot;class&quot;:&quot;App\\Models\\User&quot;,&quot;id&quot;:181965,&quot;relations&quot;:[],&quot;connection&quot;:&quot;mysql&quot;,&quot;collectionClass&quot;:null}}},&quot;checksum&quot;:&quot;1b90efb1137e188dc17cf8fd654cefb6c9f5a79382999625d181e61b8afd180a&quot;}}" wire:click="toggle" href="#" class="dropdown-item">
+    
+            <i class="far fa-eye-slash"></i> Hide Theme
+    </a>
+
+<!-- Livewire Component wire-end:3crF9UGhFTgh5VAmvmHY -->
+          <div class="dropdown-divider"></div>
+              <a href="#" class="block-button dropdown-item" data-id="181965" data-type="user" data-toggle="modal" data-target="#modal">
+          <i class="fas fa-ban" aria-hidden="true"></i>
+          Block
+        </a>
+            </div>
+</div>
+                    </span>
+                </div>
+            </div>
+            <!-- End mobile -->
+        </div>
+        <div class="d-none d-md-block mt-3 profile-header-normal-status">
+            <p><strong>Last Seen: </strong><span title="3 July 2025 12:09:31 PM" class="timestamp">46 minutes ago</span></p>
+            <p><strong>Joined: </strong>11 June 2020 08:52:05 PM</p>
+                            <p><strong>Team: </strong>Fossils</p>
+                    </div>
+        <div class="d-block d-md-none mt-3 profile-header-mobile-status">
+            <div class="card">
+                <div class="card-body">
+                    <p><strong>Last Seen: </strong></p><p class="text-right"><span title="3 July 2025 12:09:31 PM" class="timestamp">46 minutes ago</span></p>
+                    <p><strong>Joined: </strong></p><p class="text-right">11 June 2020 08:52:05 PM</p>
+                                            <p><strong>Team: </strong></p><p class="text-right">Fossils</p>
+                                    </div>
+            </div>
+        </div>
+    </div><!-- Header -->
+</div> <!-- Clearfix/Wrapper -->
+<script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+function copyText(element) {
+  var $temp = $("<input>");
+  $("body").append($temp);
+  $temp.val(element).select();
+  document.execCommand("copy");
+  $temp.remove();
+  alert("Username copied!");
+}
+
+$('.copy-text').on('click', function () {
+    copyText('fourleafisland');
+});
+</script>
+<script src="/vendor/livewire/livewire.js?id=90730a3b0e7144480175" data-turbo-eval="false" data-turbolinks-eval="false" nonce="a214d6b25535789f871d9f1e4ee5c9fe"></script><script data-turbo-eval="false" data-turbolinks-eval="false" nonce="a214d6b25535789f871d9f1e4ee5c9fe">window.livewire = new Livewire({"nonce":"a214d6b25535789f871d9f1e4ee5c9fe"});window.Livewire = window.livewire;window.livewire_app_url = '';window.livewire_token = '7Clqj2VzYD2NhACJxwAT8EClFCKrrJq286MHvI0F';window.deferLoadingAlpine = function (callback) {window.addEventListener('livewire:load', function () {callback();});};let started = false;window.addEventListener('alpine:initializing', function () {if (! started) {window.livewire.start();started = true;}});document.addEventListener("DOMContentLoaded", function () {if (! started) {window.livewire.start();started = true;}});</script>
+            <ul class="nav nav-tabs my-3">
+   <li class="nav-item " role="presentation">
+      <a class="nav-link " href="/~fourleafisland">Profile</a>
+   </li>
+   <li class="nav-item " role="presentation">
+      <a class="nav-link " href="/~fourleafisland/stats">Statistics</a>
+   </li>
+   <li class="nav-item " role="presentation">
+      <a class="nav-link " href="/~fourleafisland/characters">Characters</a>
+   </li>
+   <li class="nav-item " role="presentation">
+      <a class="nav-link " href="/~fourleafisland/attacks">Attacks</a>
+   </li>
+   <li class="nav-item active" role="presentation">
+      <a class="nav-link active" href="/~fourleafisland/defenses">Defenses</a>
+   </li>
+</ul>
+        <div class="profile-defenses" id="profile-defenses">
+  <div class="d-flex align-items-center">
+
+    <h2 class="profile-defenses-title">
+            Defenses
+           (322)
+    </h2>
+
+    <div class="btn-group defense-toggle" style="margin: 20px 0 10px auto">
+      <a href="https://artfight.net/~fourleafisland/defenses" class="btn btn-primary active">Defenses</a>
+      <a href="https://artfight.net/~fourleafisland/defenses/nonrecipient" class="btn btn-primary ~fourleafisland/defenses">Character Included In</a>
+    </div>
+
+  </div>
+
+  <div class="profile-defenses-body">
+            <div class="row clearfix">
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9411401.critter-attack" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9411401">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_Wt1xFWO7bLdy7kHsNa0ECZBQzsN9mDOGjfA5HqEuJf3Ua8lNLnkGJJHH39OD.png?t=1751568389"
+            data-toggle="tooltip"
+            title="CRITTER ATTACK by ofmanymask"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9406046.starshine" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9406046">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_HKQZCFZCQCATG2gjjpWJnv0AljmhAvpRrRe0FvUc04lWzPNG9qpeNdOI8lh9.png?t=1751567076"
+            data-toggle="tooltip"
+            title="Starshine by Jugglefish"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9401247.critter-sprite" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9401247">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_FzroyqsOWuDEiOfJAUiX9bvXR528Y4V1b5DaSleAiOdWLI8Oig671tQA9Xrl.png?t=1751565850"
+            data-toggle="tooltip"
+            title="Critter Sprite by NijikawaSatoki"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9393970.tiny-tanuki" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9393970">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_q7z3dc2Iek6CvQUUddxZ5NST3tuK0MMRgF07WqKEwAfmk3Zj4tJtEVlYl1K8.png?t=1751563902"
+            data-toggle="tooltip"
+            title="tiny tanuki by Rockabilly"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9390471.office-girlsss" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9390471">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_2sHBoborc1pjHozxPhavLKTQghVQMV0FbZlRYkysjxnGpU7M3I9DvGnIjQHc.png?t=1751562965"
+            data-toggle="tooltip"
+            title="office girlsss by colourine"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9386576.chestnut" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9386576">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_oyQFL32JOPuQT7RuFHcOhvPhraNxovNxvgGCPcgaoYBrNfmTQcUjKZpyJ05R.png?t=1751561879"
+            data-toggle="tooltip"
+            title="Chestnut by eventhorizon"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9376755.charlie2" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9376755">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_2hzrCbnZyeB8SOv9s6ewus39q9JSeZxl7GeomaqHqHWjbjMEdJPzYOJxmkYp.png?t=1751559028"
+            data-toggle="tooltip"
+            title="charlie^2 by DoxoMoxo"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9376286.cutie-pie" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9376286">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_2ZW92dNk3fgE391vpDeMtLtC9gACEzxPVrilaARmkmtAoyDZNf0146nta40z.png?t=1751558878"
+            data-toggle="tooltip"
+            title="cutie pie by deceaseddogboy"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9362331.wishing-star" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9362331">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_smxMsFhzjHdbqY2qJZtUaEOtLiHHaC6vk7omdkPrL9cqQhxlxXVComHTEEFu.png?t=1751554336"
+            data-toggle="tooltip"
+            title="Wishing Star by Graphiteyes"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9361879.what-the-crit" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9361879">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_mRgz3jbp83iYufmZ6C1xTTVsTNaLcsabauRpLs8hpaBevLWntvmOeD1cf2DC.png?t=1751554174"
+            data-toggle="tooltip"
+            title="What the crit? by Kobolding"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9360607.critter" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9360607">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_UhDvVFvvKU7tRWR9QsHnEgkUqHGFcqR0VwgzxhClDpHnI5miTAq8f948is3Q.png?t=1751553718"
+            data-toggle="tooltip"
+            title="Critter by Clownrambles"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9359663.pepper" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9359663">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_Otx5Ck1g2rJLXDYq9ZyOHvmI9Gx0gTDCfwQwOTPfrIB50nlNuwyrZGEJFai0.png?t=1751553373"
+            data-toggle="tooltip"
+            title="Pepper by ScaredOfLetters"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9359234.critter-33" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9359234">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_GO6p8if55Jqm0g2k554k6ft9KP1Q1OQwHkdSRqU56aw8RjK4z9wa2q0Gt5uy.png?t=1751553213"
+            data-toggle="tooltip"
+            title="Critter &amp;lt;33 by YellowsSillySymphs"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9350118.sleepy-angel-bunny" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9350118">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_juENIAWMEKQ09En2TNe3KxSs8WI8u0EheFxqMAuc7atDvsKmh0vHb2Hd3RSG.png?t=1751549650"
+            data-toggle="tooltip"
+            title="Sleepy Angel Bunny by MaehemIncarnate"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9343510.and-steal-new-colours-away-from-the-sun" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9343510">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_J6p6eeICNyiV5WsiSpD81JQeXVNbCB4MoBtQqs56IcUwowo09vCBJxtisMcD.png?t=1751546606"
+            data-toggle="tooltip"
+            title="and steal new colours away from the sun!! by finalserenade"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9343067.critter-your-bows-backwards-0" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9343067">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_z0CjtYroArtA5jN7ZZElEGudetGLbfI8hrvMXBhhSenMOfdy4MNWlk5p7LDX.png?t=1751546393"
+            data-toggle="tooltip"
+            title="CRITTER your bow&amp;rsquo;s backwards! :0 by Ruoyez"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9333235.cat-blink-3" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9333235">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_9Ip3rWImEeOUovQ79jfKqcH9kgeBWzdJowpXPQ00XjvcydJvTHhptGzdN5QP.png?t=1751541252"
+            data-toggle="tooltip"
+            title="Cat Blink! :3 by TeaMelca"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9332728.critter-ever" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9332728">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_BmH8XNCGbwumqWnQo02BA1GdcFIEWZiCF3UnWPyd7DuMAYQ6w6296rFoNzpK.png?t=1751540970"
+            data-toggle="tooltip"
+            title="Critter ever by KenDrawzz"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9332569.la-lepre" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9332569">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_YDXMXvvskhV1zp21y7jCtH5OL7LHYv6QrGFYL76VRxy8SRRRjVgS5uzE6Uur.gif?t=1751541240"
+            data-toggle="tooltip"
+            title="la lepre by Eskeri"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9329014.charlie-2" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9329014">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_tvGS5EUIog7XiFk1hVooYO6ObCVzjEXz76yK97t2GMQpSunlaao615Q9p4Yu.png?t=1751538917"
+            data-toggle="tooltip"
+            title="Charlie 2 by HawkmothdieMotte"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9325965.angel" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9325965">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_VRNPTEWC3N76IzS8jQUOGdrkC55LyXcc7utFCk71PLbjsl8tAnBy1TLK04zY.png?t=1751537177"
+            data-toggle="tooltip"
+            title="Angel by SorRow13"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9321542.angel-sitting" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9321542">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_fPDlbWT8cGKN0Mgm9Jh3UBB3gsvTvd0J5DveKD6sHf1LGbVXDJg3kO1ZsVkH.png?t=1751534696"
+            data-toggle="tooltip"
+            title="Angel Sitting by SoapXalotl"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9314906.ringtail-rascal-and-mr-tanuki" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9314906">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_JN1ArjRWFqw4RAxr3JV0ThsiaxZOyaMpJNDHzG60YLpPR0v3ixYt8YJ85pOG.png?t=1751531196"
+            data-toggle="tooltip"
+            title="ringtail rascal and mr tanuki by luxuryghouls"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9311557.for-fourleafisland" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9311557">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_B5upJBV5YnDKID6wdI6HXpk4rrdyItq0wfyZgmR7xuH0PugMwCMDmSkTASBM.png?t=1751529530"
+            data-toggle="tooltip"
+            title="For fourleafisland by jig-saws"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9302823.tasty-treat-time" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9302823">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_pP4A0b4JllTF38DrUMFeiTugyHdrOIGK6Y0M4j1LWRad1qs2BC8eCaoMJLKz.png?t=1751525769"
+            data-toggle="tooltip"
+            title="Tasty Treat Time! by starscrambled"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9294483.critter-d" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9294483">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_wPyuiJ9EVjuMM9xV5mxed9rPDCgCS4VR57hea48XqNVFRBxZxgI7DHXM9OQv.gif?t=1751522677"
+            data-toggle="tooltip"
+            title="Critter! :D by Daftaiyo"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9289653.critter-marketable-plushie-attack" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9289653">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_DKOResqFqObod14CgXnxBxlhMBeQ2CVqpuu73vKT3v3Ols3nm3MhWMMRLfHY.png?t=1751521126"
+            data-toggle="tooltip"
+            title="CRITTER MARKETABLE PLUSHIE ATTACK!!!! by Squeebo"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9287522.charlie-yay" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9287522">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_HbjMuKdHZ5H0RtTKnmpOH7woIUIWOhbKLEQlHkMAafw4V5Ka4OU9iexh6T7u.png?t=1751520479"
+            data-toggle="tooltip"
+            title="charlie!!! yay by cpubug"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#d35e88;">
+               <a href="https://artfight.net/attack/9281745.critter" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9281745">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_nDMwhTgTbJzMAATzVgIVOspNddkuS7Ww3UM6q6Wrv3qrijKYtd9rJk3Xyul8.png?t=1751518778"
+            data-toggle="tooltip"
+            title="Critter by Kawaiicandy60"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                    <div class="col-6 col-sm-4 col-md-2" style="border-color:#ba8c25;">
+               <a href="https://artfight.net/attack/9281044.critter-attack" class="card p-1 m-1 thumb-attack attack-thumb thumbnail" data-id="9281044">
+        <img class="mx-auto rounded" src="https://images.artfight.net/attack/th_jSr50x9sHhBN350PVKUi2VMfvhqxslgsg8aJEPYLCnO2vTLn4xsZ93JAPj9s.png?t=1751518580"
+            data-toggle="tooltip"
+            title="CRITTER ATTACK by gaypuppycat"/>
+            <div class="text-center"></div>
+        </a>
+          </div>
+                </div>
+      <div class="d-flex justify-content-center mt-3">
+        <nav>
+        <ul class="pagination">
+            
+                            <li class="page-item disabled" aria-disabled="true" aria-label="&laquo; Previous">
+                    <span class="page-link" aria-hidden="true">&lsaquo;</span>
+                </li>
+            
+            
+                            
+                
+                
+                                                                                        <li class="page-item active" aria-current="page"><span class="page-link">1</span></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=2">2</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=3">3</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=4">4</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=5">5</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=6">6</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=7">7</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=8">8</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=9">9</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=10">10</a></li>
+                                                                                                <li class="page-item"><a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=11">11</a></li>
+                                                                        
+            
+                            <li class="page-item">
+                    <a class="page-link" href="https://artfight.net/~fourleafisland/defenses?page=2" rel="next" aria-label="Next &raquo;">&rsaquo;</a>
+                </li>
+                    </ul>
+    </nav>
+
+      </div>
+        </div>
+</div>
+        </div>
+        </div> <!-- /content -->
+        <footer class="footer">
+  <div class="contain">
+    <div class="row">
+    <div class="col-md-4" style="padding-top:23px;">
+        <div id="clockbox"></div>
+        <div class="social">
+            <div class="twitter">
+                <a href="https://twitter.com/theartfight" target="_blank"><i class="fab fa-twitter"></i></a>
+            </div>
+            <div class="instagram">
+                <a href="https://www.instagram.com/artfight" target="_blank"><i class="fab fa-instagram"></i></a>
+            </div>
+            <div class="twitch">
+                <a href="https://twitch.tv/theartfight" target="_blank"><i class="fab fa-twitch"></i></a>
+            </div>
+            <div class="tumblr">
+                <a href="https://tumblr.com/artfight" target="_blank"><i class="fab fa-tumblr"></i></a>
+            </div>
+            <div class="tiktok">
+                <a href="https://www.tiktok.com/@theartfight" target="_blank"><i class="fab fa-tiktok"></i></a>
+            </div>
+            <div class="youtube">
+                <a href="https://www.youtube.com/@ArtFightOfficial" target="_blank"><i class="fab fa-youtube"></i></a>
+            </div>
+            <div class="bluesky">
+                <a href="https://bsky.app/profile/artfight.net" target="_blank"><i class="fab fa-bluesky"></i></a>
+            </div>
+        </div>
+      </div>
+      <div class="col-md-4" style="padding-top:23px;">
+        <ul class="list-inline text-center">
+            <li class="list-inline-item ml-2"><a href="https://artfight.net/info/help">Help</a></li> |
+            <li class="list-inline-item ml-2"><a href="https://artfight.net/info/contact-us">Contact a Mod</a></li> |
+            <li class="list-inline-item ml-2"><a href="https://artfight.net/info/rules">Rules</a></li> |
+            <li class="list-inline-item ml-2"><a href="https://artfight.net/info/tos">ToS</a></li> |
+            <li class="list-inline-item ml-2"><a href="https://artfight.net/info/privacy">Privacy</a></li>
+        </ul>
+        <ul class="list-inline text-center">
+            <li class="list-inline-item"><a href="https://artfight.net/info/credits">Credits</a></li> |
+            <li class="list-inline-item">&copy; 2015 <a href="https://artfight.net/lolwut">-</a> 2025 Art Fight</li>
+        </ul>
+      </div>
+      <div class="col-md-4 mb-4" style="padding-top: 23px; background-image: url(https://artfight.net/images/events/0/11-fossils-vs-crystals-footer.png);">
+                <div class="d-flex donate-section">
+            <div class="donation_meter">
+                <progress class="mt-0" max="160000" value="150146.92"></progress>
+                <br>
+                <div class="d-flex mt-2">
+                    <div>
+                        2025 Contributions: <b>$150146.92</b><br>Goal (tier 2): $160000 <a href="https://artfight.net/donate"><i class="far fa-info-circle" data-toggle="tooltip" data-placement="top" title="Click to learn all about contributions to art fight and rewards you can get for contributing."></i></a>
+                    </div>
+                    <form class="ml-auto" action="https://artfight.net/donate">
+                        <button type="submit" class="btn btn-primary donate-button" data-toggle="tooltip" data-placement="top" title="Click to contribute and to learn all about contributions to art fight and rewards you can get for contributing.">Support</button>
+                    </form>
+                </div>
+            </div>
+            <div class="ml-2">
+                <img class="donate-wormston" src="https://images.artfight.net/resources/wormston_tier_2.png" />
+            </div>
+        </div>
+              </div>
+        </div>
+    </div>
+</footer>
+    </div>
+
+    <div id="modal" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title">
+                    </h4>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body">
+                                  </div>
+      <div class="modal-footer">
+              </div>
+    </div>
+
+  </div>
+</div>
+      <script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+          $(document).on("click", ".modal-button", async function (e) {
+              // If we have a thumbnail cropper in a modal on this page, run the cropper's onSubmit function instead.
+              if (document.getElementById('modal-form').querySelector('.thumbnail-cropper-container')) {
+                await onCropperFormSubmit(e, true);
+                return;
+              } 
+
+              e.preventDefault();
+              $("#modal-form").submit();
+          });
+      </script>
+        
+    <script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+      var editors = document.getElementsByClassName('editor');
+      var i = 1001 + editors.length;
+
+      for (let editor of editors) {
+          if (!editor._sceditor) {
+              sceditor.create(editor, {
+                  format: 'bbcode',
+                  plugins: 'dragdrop,undo',
+                  toolbarExclude: 'email,youtube,date,time,print,ltr,rtl',
+                  style: "/css/sceditor-text-dark.css?id=b9b45a679f3afb3059042e394b767c82",
+                  parserOptions: {
+                      breakAfterBlock: false,
+                      removeEmptyTags: false,
+                      fixInvalidNesting: false,
+                      fixInvalidChildren: false,
+                  },
+                  dragdrop: {
+                      allowedTypes: ['none'],
+                      isAllowed: function(file) {
+                          return false;
+                      },
+                      handleFile: function(file) {
+                          return false;
+                      },
+                      handlePaste: true,
+                  },
+                  enablePasteFiltering: true,
+                  resizeMinWidth: -1,
+                  emoticons: {"dropdown":{":wormdeep:":"https:\/\/artfight.net\/css\/emoticons\/wormdeep.png",":wormlove:":"https:\/\/artfight.net\/css\/emoticons\/wormlove.png",":wormpog:":"https:\/\/artfight.net\/css\/emoticons\/wormpog.png",":wormsqueeze:":"https:\/\/artfight.net\/css\/emoticons\/wormsqueeze.png",":bluehearthug:":"https:\/\/artfight.net\/css\/emoticons\/bluehearthug.png",":blueowosob:":"https:\/\/artfight.net\/css\/emoticons\/blueowosob.png",":blueowostare:":"https:\/\/artfight.net\/css\/emoticons\/blueowostare.png",":bluesadfrown:":"https:\/\/artfight.net\/css\/emoticons\/bluesadfrown.png",":blueshock:":"https:\/\/artfight.net\/css\/emoticons\/blueshock.png",":blueuwu:":"https:\/\/artfight.net\/css\/emoticons\/blueuwu.png",":blueweary:":"https:\/\/artfight.net\/css\/emoticons\/blueweary.png",":orangecowboy:":"https:\/\/artfight.net\/css\/emoticons\/orangecowboy.png",":orangecry:":"https:\/\/artfight.net\/css\/emoticons\/orangecry.png",":orangeflushed:":"https:\/\/artfight.net\/css\/emoticons\/orangeflushed.png",":orangejoy:":"https:\/\/artfight.net\/css\/emoticons\/orangejoy.png",":orangesmile:":"https:\/\/artfight.net\/css\/emoticons\/orangesmile.png",":orangesmiley:":"https:\/\/artfight.net\/css\/emoticons\/orangesmiley.png",":orangethis:":"https:\/\/artfight.net\/css\/emoticons\/orangethis.png",":orangewah:":"https:\/\/artfight.net\/css\/emoticons\/orangewah.png",":purpleevilowo:":"https:\/\/artfight.net\/css\/emoticons\/purpleevilowo.png",":purpleno:":"https:\/\/artfight.net\/css\/emoticons\/purpleno.png",":purpleowo:":"https:\/\/artfight.net\/css\/emoticons\/purpleowo.png",":purpleowocowboy:":"https:\/\/artfight.net\/css\/emoticons\/purpleowocowboy.png",":purplepatpet:":"https:\/\/artfight.net\/css\/emoticons\/purplepatpet.png",":purplepwease:":"https:\/\/artfight.net\/css\/emoticons\/purplepwease.png",":purplesadcry:":"https:\/\/artfight.net\/css\/emoticons\/purplesadcry.png",":purplesadowocowboy:":"https:\/\/artfight.net\/css\/emoticons\/purplesadowocowboy.png",":purpleuwu:":"https:\/\/artfight.net\/css\/emoticons\/purpleuwu.png",":purplex3:":"https:\/\/artfight.net\/css\/emoticons\/purplex3.png",":redangry:":"https:\/\/artfight.net\/css\/emoticons\/redangry.png",":redblanket:":"https:\/\/artfight.net\/css\/emoticons\/redblanket.png",":redblanket2:":"https:\/\/artfight.net\/css\/emoticons\/redblanket2.png",":redcry:":"https:\/\/artfight.net\/css\/emoticons\/redcry.png",":redgrimace:":"https:\/\/artfight.net\/css\/emoticons\/redgrimace.png",":redrawr:":"https:\/\/artfight.net\/css\/emoticons\/redrawr.png",":redsob:":"https:\/\/artfight.net\/css\/emoticons\/redsob.png",":redsweat:":"https:\/\/artfight.net\/css\/emoticons\/redsweat.png",":redthonk:":"https:\/\/artfight.net\/css\/emoticons\/redthonk.png",":redwavehi:":"https:\/\/artfight.net\/css\/emoticons\/redwavehi.png"},"more":{":teamseafoam:":"https:\/\/artfight.net\/css\/emoticons\/teamseafoam.png",":teamstardust:":"https:\/\/artfight.net\/css\/emoticons\/teamstardust.png",":teamvampires:":"https:\/\/artfight.net\/css\/emoticons\/teamvampires.png",":teamwerewolves:":"https:\/\/artfight.net\/css\/emoticons\/teamwerewolves.png",":teamwither:":"https:\/\/artfight.net\/css\/emoticons\/teamwither.png",":teambloom:":"https:\/\/artfight.net\/css\/emoticons\/teambloom.png",":teamsteampunk:":"https:\/\/artfight.net\/css\/emoticons\/teamsteampunk.png",":teamcyberpunk:":"https:\/\/artfight.net\/css\/emoticons\/teamcyberpunk.png",":teamsugar:":"https:\/\/artfight.net\/css\/emoticons\/teamsugar.png",":teamspice:":"https:\/\/artfight.net\/css\/emoticons\/teamspice.png",":teamdream:":"https:\/\/artfight.net\/css\/emoticons\/teamdream.png",":teamnightmare:":"https:\/\/artfight.net\/css\/emoticons\/teamnightmare.png",":teamtea:":"https:\/\/artfight.net\/css\/emoticons\/teamtea.png",":teamcoffee:":"https:\/\/artfight.net\/css\/emoticons\/teamcoffee.png",":teamsun:":"https:\/\/artfight.net\/css\/emoticons\/teamsun.png",":teammoon:":"https:\/\/artfight.net\/css\/emoticons\/teammoon.png",":teammagic:":"https:\/\/artfight.net\/css\/emoticons\/teammagic.png",":teamtech:":"https:\/\/artfight.net\/css\/emoticons\/teamtech.png",":stamp_fossils:":"https:\/\/artfight.net\/css\/emoticons\/stamp_fossils.png",":stamp_crystals:":"https:\/\/artfight.net\/css\/emoticons\/stamp_crystals.png",":stamp_seafoam:":"https:\/\/artfight.net\/css\/emoticons\/stamp_seafoam.png",":stamp_stardust:":"https:\/\/artfight.net\/css\/emoticons\/stamp_stardust.png",":stamp_vampires:":"https:\/\/artfight.net\/css\/emoticons\/stamp_vampires.png",":stamp_werewolves:":"https:\/\/artfight.net\/css\/emoticons\/stamp_werewolves.png",":stamp_wither:":"https:\/\/artfight.net\/css\/emoticons\/stamp_wither.png",":stamp_bloom:":"https:\/\/artfight.net\/css\/emoticons\/stamp_bloom.png",":stamp_steampunk:":"https:\/\/artfight.net\/css\/emoticons\/stamp_steampunk.png",":stamp_cyberpunk:":"https:\/\/artfight.net\/css\/emoticons\/stamp_cyberpunk.png",":stamp_sugar:":"https:\/\/artfight.net\/css\/emoticons\/stamp_sugar.png",":stamp_spice:":"https:\/\/artfight.net\/css\/emoticons\/stamp_spice.png",":stamp_dream:":"https:\/\/artfight.net\/css\/emoticons\/stamp_dream.png",":stamp_nightmare:":"https:\/\/artfight.net\/css\/emoticons\/stamp_nightmare.png",":stamp_tea:":"https:\/\/artfight.net\/css\/emoticons\/stamp_tea.png",":stamp_coffee:":"https:\/\/artfight.net\/css\/emoticons\/stamp_coffee.png",":stamp_moon:":"https:\/\/artfight.net\/css\/emoticons\/stamp_moon.png",":stamp_sun:":"https:\/\/artfight.net\/css\/emoticons\/stamp_sun.png",":stamp_technology:":"https:\/\/artfight.net\/css\/emoticons\/stamp_technology.png",":stamp_magic:":"https:\/\/artfight.net\/css\/emoticons\/stamp_magic.png",":stamp_monochrome:":"https:\/\/artfight.net\/css\/emoticons\/stamp_monochrome.png",":stamp_color:":"https:\/\/artfight.net\/css\/emoticons\/stamp_color.png"}},
+                  emoticonsCompat: true,
+                  autoUpdate: true,
+              });
+              editor.previousSibling.style.zIndex = i;
+              i -= 1;
+          }
+      };
+    </script>
+
+<script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+    // Needs to be included on the form "onsubmit" for any sceditor appearing in a modal
+    function editorModalSubmit() {
+        let textEditors = document.querySelectorAll('.modal-body .editor');
+        for (let textEditor of textEditors) {
+            textEditor._sceditor.updateOriginal();
+        }
+    }
+</script>
+<script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+    $('.report-button').on('click', function (e) {
+        e.preventDefault();
+        getModal('/report/create/' + $(this).data('type') + '/' + $(this).data('id'));
+    });
+</script>
+<script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+    $('.comment-edit').on('click', function (e) {
+        e.preventDefault();
+        getModal('/comment/edit/' + $(this).data('id'));
+    });
+    $('.comment-delete').on('click', function (e) {
+        e.preventDefault();
+        getModal('/comment/delete/' + $(this).data('id'));
+    });
+
+    function onReplyClick(e) {
+        e.preventDefault();
+
+        let textEditors = document.querySelectorAll('.editor');
+        let last = textEditors[textEditors.length - 1];
+
+        if (last) {
+            last._sceditor.insertText(`@${e.target.closest('.comment').dataset.author}\n`);
+            last.parentNode.scrollIntoView({ block: 'center' });
+        }
+    }
+
+    $('.reply-btn').on('click', function () {
+        onReplyClick(event);
+    });
+</script>
+
+<script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+    $("#followers").on("click", function (e) {
+        e.preventDefault();
+        var user = $(this).data('user');
+        getModal("/~" + user + "/followers");
+    });
+    $(".block-button").on("click", function (e) {
+        e.preventDefault();
+        getModal('/user/block/' + $(this).data('id'));
+    });
+    $(".bookmark-character").on("click", function () {
+        var id = $(this).data('id');
+        getModal('/character/bookmark/' + id);
+    });
+    $(".unhide-profile").on("click", function () {
+        $("#profileBlocked").css("display", "block");
+        $("#profileBlockedCard").css("display", "none");
+    })
+</script>
+
+        <script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+            $(function () {
+                $('[data-toggle="tooltip"]').tooltip()
+            })
+        </script>
+
+        
+        <script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+            var selection = document.querySelector('.form-submit-once');
+            if (selection !== null) {
+                selection.addEventListener('submit', function() {
+                    var btnSubmitOnce = document.querySelector('.btn-submit-once');
+                    btnSubmitOnce.setAttribute('disabled', 'true');
+                    btnSubmitOnce.value = "Submitting, please wait.";
+                });
+            };
+        </script>
+
+        <script nonce="a214d6b25535789f871d9f1e4ee5c9fe">
+            $(document).on('click', '.spoiler-button', function () {
+                let $button = $(this);
+                let $panelBody = $button.closest('.spoiler').find('.panel-body');
+
+                let isVisible = $panelBody.is(':visible');
+                $panelBody.toggle(!isVisible);
+                $button.text(isVisible ? 'Show' : 'Hide');
+            });
+        </script>
+  <script nonce="a214d6b25535789f871d9f1e4ee5c9fe">(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.nonce='a214d6b25535789f871d9f1e4ee5c9fe';d.innerHTML="window.__CF$cv$params={r:'95989a275d201dc7',t:'MTc1MTU2ODk3OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='a214d6b25535789f871d9f1e4ee5c9fe';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
