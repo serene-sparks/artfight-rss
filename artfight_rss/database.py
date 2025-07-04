@@ -497,18 +497,18 @@ class ArtFightDatabase:
                     standings_by_date[date_key] = []
                 standings_by_date[date_key].append(standing)
             
-            # Get the last standing of each day
-            daily_last_standings = []
+            # Get the first standing of each day
+            daily_first_standings = []
             for date_key, day_standings in standings_by_date.items():
-                # Sort by time and get the latest
-                day_standings.sort(key=lambda s: s.fetched_at, reverse=True)
-                daily_last_standings.append(day_standings[0])
+                # Sort by time and get the earliest
+                day_standings.sort(key=lambda s: s.fetched_at)
+                daily_first_standings.append(day_standings[0])
             
             # Get all leader changes
             leader_changes = [standing for standing in all_standings if standing.leader_change]
             
-            # Combine and deduplicate (leader changes might be the same as daily last)
-            combined_standings = daily_last_standings + leader_changes
+            # Combine and deduplicate (leader changes might be the same as daily first)
+            combined_standings = daily_first_standings + leader_changes
             
             # Remove duplicates based on fetched_at (within 1 second tolerance)
             unique_standings = []
