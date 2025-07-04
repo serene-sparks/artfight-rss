@@ -1,6 +1,6 @@
 # ArtFight RSS Service
 
-A Python RSS service that monitors ArtFight profiles and team standings, generating RSS feeds for Discord RSS bots.
+A Python RSS service that monitors ArtFight profiles and team standings
 
 ## Features
 
