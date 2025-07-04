@@ -1,5 +1,6 @@
 """Data models for the ArtFight webhook service."""
 
+import html
 from datetime import datetime
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -20,11 +21,11 @@ class ArtFightAttack(BaseModel):
     def to_rss_item(self) -> dict:
         """Convert to RSS item format."""
         return {
-            "title": f"{self.title}",
-            "description": self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}",
+            "title": html.escape(self.title),
+            "description": html.escape(self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}"),
             "link": str(self.url),
-            "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S %z"),
-            "guid": self.id,
+            "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
+            "guid": str(self.url),
         }
 
 
@@ -43,11 +44,11 @@ class ArtFightDefense(BaseModel):
     def to_rss_item(self) -> dict:
         """Convert to RSS item format."""
         return {
-            "title": f"{self.title}",
-            "description": self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}",
+            "title": html.escape(self.title),
+            "description": html.escape(self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}"),
             "link": str(self.url),
-            "fetchDate": self.fetched_at.isoformat(),
-            "guid": self.id,
+            "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
+            "guid": str(self.url),
         }
 
 
@@ -75,11 +76,11 @@ class TeamStanding(BaseModel):
         else:
             title = "Team Standings Update"
         return {
-            "title": title,
-            "description": f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%",
+            "title": html.escape(title),
+            "description": html.escape(f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%"),
             "link": "https://artfight.net/teams",
-            "fetchDate": self.fetched_at.isoformat(),
-            "guid": f"team-standings-{self.fetched_at.isoformat()}",
+            "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
+            "guid": f"team-standings-{self.fetched_at.strftime('%Y%m%d%H%M%S')}",
         }
 
 
@@ -126,7 +127,7 @@ class RSSFeed(BaseModel):
         <title>{self.title}</title>
         <description>{self.description}</description>
         <link>{self.link}</link>
-        <lastBuildDate>{self.last_updated.strftime('%a, %d %b %Y %H:%M:%S %z')}</lastBuildDate>
+        <lastBuildDate>{self.last_updated.strftime('%a, %d %b %Y %H:%M:%S +0000')}</lastBuildDate>
         {items_xml}
     </channel>
 </rss>"""
