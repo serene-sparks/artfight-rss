@@ -104,7 +104,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths={project_root}/cache {project_root}/venv
+ReadWritePaths={project_root}/data {project_root}/cache {project_root}/venv
 
 [Install]
 WantedBy=multi-user.target
@@ -120,6 +120,10 @@ WantedBy=multi-user.target
 
 def setup_directories(project_root: Path, user: str, group: str):
     """Set up directories and permissions."""
+    # Create data directory if it doesn't exist
+    data_dir = project_root / "data"
+    data_dir.mkdir(exist_ok=True)
+    
     # Create cache directory if it doesn't exist
     cache_dir = project_root / "cache"
     cache_dir.mkdir(exist_ok=True)
@@ -129,6 +133,7 @@ def setup_directories(project_root: Path, user: str, group: str):
     
     # Set permissions
     run_command(["chmod", "755", str(project_root)])
+    run_command(["chmod", "755", str(data_dir)])
     run_command(["chmod", "755", str(cache_dir)])
     
     print("✅ Directory permissions set")
@@ -145,6 +150,58 @@ def enable_and_start_service():
     run_command(["systemctl", "start", "artfight-rss"])
     
     print("✅ Service enabled and started")
+
+def verify_database_path(project_root: Path, user: str):
+    """Verify that the database path in config.toml is writable."""
+    config_file = project_root / "config.toml"
+    if not config_file.exists():
+        print("❌ config.toml not found!")
+        return False
+    
+    try:
+        # Simple TOML parsing for db_path using standard library
+        db_path_str = "data/artfight_data.db"  # Default path
+        
+        with open(config_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("db_path") and "=" in line:
+                    # Extract the value after the equals sign
+                    value = line.split("=", 1)[1].strip()
+                    # Remove quotes if present
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1]
+                    elif value.startswith("'") and value.endswith("'"):
+                        value = value[1:-1]
+                    db_path_str = value
+                    break
+        
+        db_path = project_root / db_path_str
+        
+        # Check if the directory is writable
+        db_dir = db_path.parent
+        if not db_dir.exists():
+            print(f"❌ Database directory does not exist: {db_dir}")
+            print(f"   Please ensure the directory exists and is writable by user '{user}'")
+            return False
+        
+        # Test if the user can write to the directory
+        test_file = db_dir / ".test_write"
+        try:
+            test_file.touch()
+            test_file.unlink()
+            print(f"✅ Database path is writable: {db_path}")
+            return True
+        except (PermissionError, OSError):
+            print(f"❌ Database path is not writable: {db_path}")
+            print(f"   Directory: {db_dir}")
+            print(f"   User: {user}")
+            print(f"   Please ensure the directory is writable by user '{user}'")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error verifying database path: {e}")
+        return False
 
 def check_service_status():
     """Check the service status."""
@@ -243,11 +300,16 @@ def main():
         # Install dependencies
         install_dependencies(pip_path, project_root, user, group)
         
-        # Create systemd service
-        create_systemd_service(project_root, user, group, port_int, python_path)
-        
         # Setup directories
         setup_directories(project_root, user, group)
+        
+        # Verify database path is writable
+        if not verify_database_path(project_root, user):
+            print("❌ Database path verification failed. Please fix the configuration.")
+            sys.exit(1)
+        
+        # Create systemd service
+        create_systemd_service(project_root, user, group, port_int, python_path)
         
         # Enable and start service
         enable_and_start_service()

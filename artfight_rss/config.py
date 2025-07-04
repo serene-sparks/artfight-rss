@@ -240,7 +240,7 @@ class Settings(BaseSettings):
 
     # Database settings
     db_path: Path = Field(
-        default=Path("artfight_data.db"),
+        default=Path("data/artfight_data.db"),
         description="Path to the permanent SQLite database"
     )
 
