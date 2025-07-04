@@ -95,12 +95,49 @@ whitelist = [
 
 ### 4. Run the Service
 
+#### Development
 ```bash
-# Development
 uv run python -m artfight_rss.main
+```
 
-# Production
+#### Production - Manual Start
+```bash
 uv run uvicorn artfight_rss.main:app --host 0.0.0.0 --port 8000
+```
+
+#### Production - Systemd Service (Recommended)
+For production deployment, install as a systemd service for automatic startup and management:
+
+```bash
+# Create a dedicated user (optional but recommended)
+sudo useradd -r -s /bin/false artfight-rss
+
+# Run the setup script
+sudo python scripts/setup_systemd.py
+```
+
+The setup script will:
+- Create a systemd service file at `/etc/systemd/system/artfight-rss.service`
+- Set proper permissions and ownership
+- Enable and start the service
+- Configure automatic restarts
+
+**Service Management:**
+```bash
+# View logs
+journalctl -u artfight-rss -f
+
+# Stop service
+sudo systemctl stop artfight-rss
+
+# Start service
+sudo systemctl start artfight-rss
+
+# Restart service
+sudo systemctl restart artfight-rss
+
+# Disable service
+sudo systemctl disable artfight-rss
 ```
 
 ## Docker Deployment
