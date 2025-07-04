@@ -1,6 +1,7 @@
 """Data models for the ArtFight webhook service."""
 
 import html
+import xml.sax.saxutils
 from datetime import datetime
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -113,8 +114,8 @@ class RSSFeed(BaseModel):
         for item in self.items:
             items_xml += f"""
             <item>
-                <title>{item['title']}</title>
-                <description>{item['description']}</description>
+                <title>{xml.sax.saxutils.escape(item['title'])}</title>
+                <description>{xml.sax.saxutils.escape(item['description'])}</description>
                 <link>{item['link']}</link>
                 <pubDate>{item['fetchDate']}</pubDate>
                 <guid>{item['guid']}</guid>
@@ -124,8 +125,8 @@ class RSSFeed(BaseModel):
         return f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
     <channel>
-        <title>{self.title}</title>
-        <description>{self.description}</description>
+        <title>{xml.sax.saxutils.escape(self.title)}</title>
+        <description>{xml.sax.saxutils.escape(self.description)}</description>
         <link>{self.link}</link>
         <lastBuildDate>{self.last_updated.strftime('%a, %d %b %Y %H:%M:%S +0000')}</lastBuildDate>
         {items_xml}
