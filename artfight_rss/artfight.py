@@ -684,6 +684,7 @@ class ArtFightClient:
         team1_percentage = self._parse_team_percentage_by_color(progress_bars)
         if team1_percentage is not None:
             fetched_at = datetime.now()
+            
             standing = TeamStanding(
                 team1_percentage=team1_percentage,
                 fetched_at=fetched_at,

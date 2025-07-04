@@ -26,6 +26,7 @@ class TeamConfig(BaseModel):
 
     name: str = Field(..., description="Team name")
     color: str = Field(..., description="Team color hex code (e.g., #BA8C25)")
+    image_url: str = Field(..., description="Team image URL for RSS feeds")
 
 
 class TeamSettings(BaseModel):
@@ -237,6 +238,10 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0", description="Server host")
     port: int = Field(default=8000, description="Server port")
     debug: bool = Field(default=False, description="Debug mode")
+    live_reload: bool = Field(default=False, description="Enable live reload for development")
+    
+    # RSS feed settings
+    max_users_per_feed: int = Field(default=5, description="Maximum number of users allowed in a single multiuser feed")
 
     # Database settings
     db_path: Path = Field(

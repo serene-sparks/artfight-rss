@@ -88,7 +88,7 @@ async def health_check():
 async def get_stats():
     """Get monitoring statistics."""
     return monitor.get_stats()
-
+ 
 
 @app.get("/rss/user/{username}/attacks")
 async def get_user_rss(username: str):
@@ -138,6 +138,124 @@ async def get_team_standings_changes_rss():
     # Get team standing changes from database
     standings = database.get_team_standing_changes(days=30)
     feed = rss_generator.generate_team_changes_feed(standings)
+
+    return PlainTextResponse(
+        feed.to_rss_xml(),
+        media_type="application/rss+xml"
+    )
+
+
+@app.get("/rss/attacks/{usernames}")
+async def get_multiuser_attacks_rss(usernames: str):
+    """Get RSS feed for multiple users' attacks."""
+    # Parse usernames from URL (format: user1+user2+user3)
+    username_list = usernames.split('+')
+    
+    # Check if any users are provided
+    if not username_list or not any(username_list):
+        raise HTTPException(
+            status_code=400, 
+            detail="No users specified. Please provide at least one username."
+        )
+    
+    # Check user limit
+    if len(username_list) > settings.max_users_per_feed:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Too many users. Maximum allowed: {settings.max_users_per_feed}"
+        )
+    
+    # Check if all users are in whitelist
+    if settings.whitelist:
+        invalid_users = [u for u in username_list if u not in settings.whitelist]
+        if invalid_users:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Users not found: {', '.join(invalid_users)}"
+            )
+
+    # Get attacks for all users
+    attacks = database.get_attacks_for_users(username_list, limit=50)
+    feed = rss_generator.generate_multiuser_attacks_feed(username_list, attacks)
+
+    return PlainTextResponse(
+        feed.to_rss_xml(),
+        media_type="application/rss+xml"
+    )
+
+
+@app.get("/rss/defenses/{usernames}")
+async def get_multiuser_defenses_rss(usernames: str):
+    """Get RSS feed for multiple users' defenses."""
+    # Parse usernames from URL (format: user1+user2+user3)
+    username_list = usernames.split('+')
+    
+    # Check if any users are provided
+    if not username_list or not any(username_list):
+        raise HTTPException(
+            status_code=400, 
+            detail="No users specified. Please provide at least one username."
+        )
+    
+    # Check user limit
+    if len(username_list) > settings.max_users_per_feed:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Too many users. Maximum allowed: {settings.max_users_per_feed}"
+        )
+    
+    # Check if all users are in whitelist
+    if settings.whitelist:
+        invalid_users = [u for u in username_list if u not in settings.whitelist]
+        if invalid_users:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Users not found: {', '.join(invalid_users)}"
+            )
+
+    # Get defenses for all users
+    defenses = database.get_defenses_for_users(username_list, limit=50)
+    feed = rss_generator.generate_multiuser_defenses_feed(username_list, defenses)
+
+    return PlainTextResponse(
+        feed.to_rss_xml(),
+        media_type="application/rss+xml"
+    )
+
+
+@app.get("/rss/combined/{usernames}")
+async def get_multiuser_combined_rss(usernames: str):
+    """Get combined RSS feed for multiple users' attacks and defenses."""
+    # Parse usernames from URL (format: user1+user2+user3)
+    username_list = usernames.split('+')
+    
+    # Check if any users are provided
+    if not username_list or not any(username_list):
+        raise HTTPException(
+            status_code=400, 
+            detail="No users specified. Please provide at least one username."
+        )
+    
+    # Check user limit
+    if len(username_list) > settings.max_users_per_feed:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Too many users. Maximum allowed: {settings.max_users_per_feed}"
+        )
+    
+    # Check if all users are in whitelist
+    if settings.whitelist:
+        invalid_users = [u for u in username_list if u not in settings.whitelist]
+        if invalid_users:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Users not found: {', '.join(invalid_users)}"
+            )
+
+    # Get both attacks and defenses for all users
+    attacks = database.get_attacks_for_users(username_list, limit=25)
+    defenses = database.get_defenses_for_users(username_list, limit=25)
+    feed = rss_generator.generate_multiuser_combined_feed(username_list, attacks, defenses)
 
     return PlainTextResponse(
         feed.to_rss_xml(),
@@ -205,7 +323,7 @@ if __name__ == "__main__":
         "artfight_rss.main:app",
         host=settings.host,
         port=settings.port,
-        reload=settings.debug,
+        reload=settings.live_reload,
         log_config=None,  # Prevent uvicorn from overriding our logging config
         log_level=None    # Prevent uvicorn from resetting log level
     )

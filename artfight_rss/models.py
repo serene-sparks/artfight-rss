@@ -46,8 +46,8 @@ class ArtFightDefense(BaseModel):
         """Convert to RSS item format."""
         return {
             "title": self.title,
-            "description": self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}. <img src='{self.image_url}' />",
-            "link": str(self.url),
+            "description": self.description or f"New defense: '{self.title}' by {self.attacker_user} on {self.defender_user}. <a href='{self.url}'>View on ArtFight</a>",
+            "link": str(self.image_url),
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": str(self.url),
         }
@@ -64,22 +64,29 @@ class TeamStanding(BaseModel):
         """Convert to RSS item format."""
         team1_name = "Team 1"
         team2_name = "Team 2"
+        team1_image = None
+        team2_image = None
         
-        # Get team names from config if available
+        # Get team names and images from config if available
         from .config import settings
         if settings.teams:
             team1_name = settings.teams.team1.name
             team2_name = settings.teams.team2.name
+            team1_image = settings.teams.team1.image_url
+            team2_image = settings.teams.team2.image_url
         
+        leader_image = team1_image if self.team1_percentage > 50 else team2_image
         if self.leader_change:
             leader = team1_name if self.team1_percentage > 50 else team2_name
             title = f"Leader Change: {leader} takes the lead!"
         else:
             title = "Team Standings Update"
+            description = f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%. <img src='{leader_image}' />"
+        
         return {
             "title": title,
-            "description": f"{team1_name}: {self.team1_percentage:.4f}%, {team2_name}: {100-self.team1_percentage:.4f}%",
-            "link": "https://artfight.net/teams",
+            "description": description,
+            "link": "{leader_image}",
             "fetchDate": self.fetched_at.strftime("%a, %d %b %Y %H:%M:%S +0000"),
             "guid": f"team-standings-{self.fetched_at.strftime('%Y%m%d%H%M%S')}",
             "isPermaLink": False,

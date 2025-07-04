@@ -112,6 +112,86 @@ class RSSGenerator:
             items=[]
         )
 
+    def generate_multiuser_attacks_feed(self, usernames: list[str], attacks: list[ArtFightAttack]) -> RSSFeed:
+        """Generate RSS feed for multiple users' attacks."""
+        if len(usernames) > settings.max_users_per_feed:
+            usernames = usernames[:settings.max_users_per_feed]
+        
+        usernames_str = "+".join(usernames)
+        feed_url = urljoin(self.base_url, f"/rss/attacks/{usernames_str}")
+
+        # Convert attacks to RSS items
+        items = []
+        for attack in attacks:
+            items.append(attack.to_rss_item())
+
+        return RSSFeed(
+            title=f"ArtFight Attacks - {usernames_str}",
+            description=f"Recent attacks by {usernames_str} on ArtFight",
+            link=parse_obj_as(HttpUrl, feed_url),
+            items=items
+        )
+
+    def generate_multiuser_defenses_feed(self, usernames: list[str], defenses: list[ArtFightDefense]) -> RSSFeed:
+        """Generate RSS feed for multiple users' defenses."""
+        if len(usernames) > settings.max_users_per_feed:
+            usernames = usernames[:settings.max_users_per_feed]
+        
+        usernames_str = "+".join(usernames)
+        feed_url = urljoin(self.base_url, f"/rss/defenses/{usernames_str}")
+
+        # Convert defenses to RSS items
+        items = []
+        for defense in defenses:
+            items.append(defense.to_rss_item())
+
+        return RSSFeed(
+            title=f"ArtFight Defenses - {usernames_str}",
+            description=f"Recent defenses by {usernames_str} on ArtFight",
+            link=parse_obj_as(HttpUrl, feed_url),
+            items=items
+        )
+
+    def generate_multiuser_combined_feed(self, usernames: list[str], attacks: list[ArtFightAttack], defenses: list[ArtFightDefense]) -> RSSFeed:
+        """Generate combined RSS feed for multiple users' attacks and defenses."""
+        if len(usernames) > settings.max_users_per_feed:
+            usernames = usernames[:settings.max_users_per_feed]
+        
+        usernames_str = "+".join(usernames)
+        feed_url = urljoin(self.base_url, f"/rss/combined/{usernames_str}")
+
+        # Convert both attacks and defenses to RSS items
+        items = []
+        for attack in attacks:
+            items.append(attack.to_rss_item())
+        for defense in defenses:
+            items.append(defense.to_rss_item())
+
+        # Sort by fetched_at (newest first)
+        items.sort(key=lambda x: x['fetchDate'], reverse=True)
+
+        return RSSFeed(
+            title=f"ArtFight Activity - {usernames_str}",
+            description=f"Recent attacks and defenses by {usernames_str} on ArtFight",
+            link=parse_obj_as(HttpUrl, feed_url),
+            items=items
+        )
+
+    def generate_empty_multiuser_feed(self, usernames: list[str], feed_type: str) -> RSSFeed:
+        """Generate empty RSS feed for multiple users."""
+        if len(usernames) > settings.max_users_per_feed:
+            usernames = usernames[:settings.max_users_per_feed]
+        
+        usernames_str = "+".join(usernames)
+        feed_url = urljoin(self.base_url, f"/rss/{feed_type}/{usernames_str}")
+
+        return RSSFeed(
+            title=f"ArtFight {feed_type.title()} - {usernames_str}",
+            description=f"Recent {feed_type} by {usernames_str} on ArtFight",
+            link=parse_obj_as(HttpUrl, feed_url),
+            items=[]
+        )
+
 
 # Global RSS generator instance
 rss_generator = RSSGenerator()

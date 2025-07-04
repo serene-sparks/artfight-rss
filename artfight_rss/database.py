@@ -166,19 +166,28 @@ class ArtFightDatabase:
 
     def get_attacks_for_user(self, username: str, limit: Optional[int] = None) -> List[ArtFightAttack]:
         """Get attacks for a user, ordered by creation date (newest first)."""
+        return self.get_attacks_for_users([username], limit)
+
+    def get_attacks_for_users(self, usernames: List[str], limit: Optional[int] = None) -> List[ArtFightAttack]:
+        """Get attacks for multiple users, ordered by creation date (newest first)."""
+        if not usernames:
+            return []
+            
         with sqlite3.connect(self.db_path) as conn:
-            query = """
+            # Create placeholders for the IN clause
+            placeholders = ','.join(['?' for _ in usernames])
+            query = f"""
                 SELECT id, title, description, image_url, attacker_user, attacker_user, 
                        fetched_at, url
                 FROM attacks 
-                WHERE attacker_user = ? 
-                ORDER BY fetched_at ASC
+                WHERE attacker_user IN ({placeholders})
+                ORDER BY fetched_at DESC
             """
             
             if limit:
                 query += f" LIMIT {limit}"
                 
-            cursor = conn.execute(query, (username,))
+            cursor = conn.execute(query, usernames)
             rows = cursor.fetchall()
             
             attacks = []
@@ -210,19 +219,28 @@ class ArtFightDatabase:
 
     def get_defenses_for_user(self, username: str, limit: Optional[int] = None) -> List[ArtFightDefense]:
         """Get defenses for a user, ordered by creation date (newest first)."""
+        return self.get_defenses_for_users([username], limit)
+
+    def get_defenses_for_users(self, usernames: List[str], limit: Optional[int] = None) -> List[ArtFightDefense]:
+        """Get defenses for multiple users, ordered by creation date (newest first)."""
+        if not usernames:
+            return []
+            
         with sqlite3.connect(self.db_path) as conn:
-            query = """
+            # Create placeholders for the IN clause
+            placeholders = ','.join(['?' for _ in usernames])
+            query = f"""
                 SELECT id, title, description, image_url, defender_user, attacker_user, 
                        fetched_at, url
                 FROM defenses 
-                WHERE defender_user = ? 
-                ORDER BY fetched_at ASC
+                WHERE defender_user IN ({placeholders})
+                ORDER BY fetched_at DESC
             """
             
             if limit:
                 query += f" LIMIT {limit}"
                 
-            cursor = conn.execute(query, (username,))
+            cursor = conn.execute(query, usernames)
             rows = cursor.fetchall()
             
             defenses = []
