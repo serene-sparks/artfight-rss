@@ -6,7 +6,7 @@ authors = [
     {name = "ArtFight RSS Service", email = "admin@example.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
