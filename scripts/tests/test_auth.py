@@ -2,6 +2,7 @@
 """Test script to verify ArtFight authentication using requests."""
 
 import os
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -70,4 +71,4 @@ with requests.Session() as session:
         print("❌ Redirected (302) - may be redirected to login")
         print(f"  Redirect location: {response.headers.get('location', 'unknown')}")
     else:
-        print(f"❌ Unexpected status code: {response.status_code}") 
+        print(f"❌ Unexpected status code: {response.status_code}")

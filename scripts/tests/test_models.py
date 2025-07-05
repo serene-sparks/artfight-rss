@@ -1,6 +1,6 @@
 """Tests for data models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import HttpUrl
 
@@ -15,7 +15,7 @@ def test_artfight_attack_creation():
         description="A test attack",
         attacker_user="attacker_user",
         defender_user="defender_user",
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
         url=HttpUrl("https://artfight.net/attack/123")
     )
 
@@ -33,7 +33,7 @@ def test_artfight_attack_to_atom_item():
         description="A test attack",
         attacker_user="attacker_user",
         defender_user="defender_user",
-        fetched_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        fetched_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC),
         url=HttpUrl("https://artfight.net/attack/123")
     )
 
@@ -50,7 +50,7 @@ def test_team_standing_creation():
     """Test creating a TeamStanding."""
     standing = TeamStanding(
         team1_percentage=60.0,
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
         leader_change=False
     )
 
@@ -62,7 +62,7 @@ def test_team_standing_to_atom_item():
     """Test converting TeamStanding to Atom item."""
     standing = TeamStanding(
         team1_percentage=60.0,
-        fetched_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        fetched_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC),
         leader_change=True
     )
 

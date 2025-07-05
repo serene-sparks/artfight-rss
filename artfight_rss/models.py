@@ -1,8 +1,6 @@
 """Data models for the ArtFight webhook service."""
 
-import html
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from feedgen.feed import FeedGenerator
 from pydantic import BaseModel, Field, HttpUrl
@@ -24,7 +22,7 @@ class ArtFightAttack(BaseModel):
         """Convert to Atom item format."""
         return {
             "title": self.title,
-            "description": self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}. ![Image]({self.image_url})",
+            "description": self.description or f"New attack: '{self.title}' by `{self.attacker_user}` on `{self.defender_user}`.\n\n![Image]({self.image_url})",
             "link": str(self.url),
             "published": self.fetched_at,
             "entry_id": str(self.url),
@@ -49,7 +47,7 @@ class ArtFightDefense(BaseModel):
         """Convert to Atom item format."""
         return {
             "title": self.title,
-            "description": self.description or f"{self.attacker_user} attacked {self.defender_user} with '{self.title}'.\n\n![Image]({self.image_url})\n\n[View on ArtFight]({self.url})",
+            "description": self.description or f"`{self.attacker_user}` attacked `{self.defender_user}` with '{self.title}'.\n\n![Image]({self.image_url})\n\n[View on ArtFight]({self.url})",
             "link": str(self.url),
             "published": self.fetched_at,
             "entry_id": str(self.url),
@@ -71,7 +69,7 @@ class TeamStanding(BaseModel):
         team2_name = "Team 2"
         team1_image = None
         team2_image = None
-        
+
         # Get team names and images from config if available
         from .config import settings
         if settings.teams:
@@ -79,7 +77,7 @@ class TeamStanding(BaseModel):
             team2_name = settings.teams.team2.name
             team1_image = settings.teams.team1.image_url
             team2_image = settings.teams.team2.image_url
-        
+
         leader_image = team1_image if self.team1_percentage > 50 else team2_image
         if self.leader_change:
             leader = team1_name if self.team1_percentage > 50 else team2_name
@@ -88,7 +86,7 @@ class TeamStanding(BaseModel):
         else:
             title = "Team Standings Update"
             description = f"{team1_name}: {self.team1_percentage:.5f}%, {team2_name}: {100-self.team1_percentage:.5f}%.\n\n![Image]({leader_image})"
-        
+
         return {
             "title": title,
             "description": description,
@@ -110,7 +108,7 @@ class CacheEntry(BaseModel):
 
     def is_expired(self) -> bool:
         """Check if the cache entry has expired."""
-        age = (datetime.now(timezone.utc) - self.timestamp).total_seconds()
+        age = (datetime.now(UTC) - self.timestamp).total_seconds()
         return age > self.ttl
 
 
@@ -124,12 +122,12 @@ class AtomFeed:
         self.fg.link(href=link)
         self.fg.id(feed_id)
         self.fg.language('en')
-        self.fg.updated(datetime.now(timezone.utc))
+        self.fg.updated(datetime.now(UTC))
 
-    def add_item(self, title: str, description: str, link: str, 
-                 published: datetime, entry_id: str, 
-                 author: Optional[str] = None, 
-                 image_url: Optional[str] = None) -> None:
+    def add_item(self, title: str, description: str, link: str,
+                 published: datetime, entry_id: str,
+                 author: str | None = None,
+                 image_url: str | None = None) -> None:
         """Add an item to the Atom feed."""
         fe = self.fg.add_entry()
         fe.title(title)
@@ -137,10 +135,10 @@ class AtomFeed:
         fe.link(href=link)
         fe.published(published)
         fe.id(entry_id)
-        
+
         if author:
             fe.author(name=author)
-        
+
         if image_url:
             # Add image as content with markdown
             fe.content(f'{description}\n\n![Image]({image_url})', type='text/markdown')

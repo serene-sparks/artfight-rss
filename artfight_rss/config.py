@@ -1,12 +1,15 @@
 """Configuration management for the ArtFight webhook service."""
 
-import os
 from pathlib import Path
-from typing import Any, Dict, Tuple, Type
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
 from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 try:
     import tomllib
@@ -38,10 +41,10 @@ class TeamSettings(BaseModel):
 
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
     """Custom settings source for TOML configuration files."""
-    
+
     def get_field_value(
         self, field: FieldInfo, field_name: str
-    ) -> Tuple[Any, str, bool]:
+    ) -> tuple[Any, str, bool]:
         """Get field value from TOML config."""
         # Load TOML config from any available path
         for path in get_config_paths():
@@ -50,7 +53,7 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
                 if config_data and field_name in config_data:
                     print(f"✅ Found {field_name} in TOML config: {path}")
                     return config_data[field_name], field_name, False
-        
+
         return None, field_name, False
 
     def prepare_field_value(
@@ -59,7 +62,7 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
         """Prepare field value for specific field types."""
         if value is None:
             return None
-            
+
         if field_name == "users" and isinstance(value, list):
             # Handle users list - convert dicts to UserConfig objects
             return [UserConfig(**user) for user in value]
@@ -76,10 +79,10 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
             # Handle other simple values
             return value
 
-    def __call__(self) -> Dict[str, Any]:
+    def __call__(self) -> dict[str, Any]:
         """Load all settings from TOML files."""
         print("🔍 Checking for TOML configuration files...")
-        
+
         # Load TOML config from any available path
         for path in get_config_paths():
             print(f"  Checking path: {path}")
@@ -89,10 +92,10 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
                 if config_data:
                     print(f"✅ Loaded configuration from: {path}")
                     print(f"  Config keys: {list(config_data.keys())}")
-                    
+
                     # Convert TOML data to be compatible with pydantic-settings
                     processed_data = {}
-                    
+
                     for key, value in config_data.items():
                         if key == "users":
                             # Handle users list - convert dicts to UserConfig objects
@@ -101,7 +104,7 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
                         elif key == "teams":
                             # Handle teams configuration - convert to TeamSettings object
                             processed_data["teams"] = TeamSettings(**value)
-                            print(f"  Processed teams configuration")
+                            print("  Processed teams configuration")
                         elif key == "whitelist":
                             # Handle whitelist
                             processed_data["whitelist"] = value
@@ -115,10 +118,10 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
                         else:
                             # Handle other simple values
                             processed_data[key] = value
-                    
+
                     print(f"  Returning processed data with keys: {list(processed_data.keys())}")
                     return processed_data
-        
+
         print("❌ No configuration file found, using defaults and environment variables")
         return {}
 
@@ -137,12 +140,12 @@ class Settings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls: Type[BaseSettings],
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
-    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Customize configuration sources with proper precedence."""
         return (
             init_settings,  # Highest precedence: explicit kwargs
@@ -219,7 +222,7 @@ class Settings(BaseSettings):
         default="https://artfight.net",
         description="Base URL for ArtFight"
     )
-    
+
     # Authentication settings
     laravel_session: str | None = Field(
         default=None,
@@ -239,7 +242,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, description="Server port")
     debug: bool = Field(default=False, description="Debug mode")
     live_reload: bool = Field(default=False, description="Enable live reload for development")
-    
+
     # RSS feed settings
     max_users_per_feed: int = Field(default=5, description="Maximum number of users allowed in a single multiuser feed")
     max_feed_items: int = Field(default=50, description="Maximum number of items returned in a feed")
@@ -267,11 +270,11 @@ class Settings(BaseSettings):
     )
 
 
-def load_toml_config(config_path: Path) -> Dict[str, Any]:
+def load_toml_config(config_path: Path) -> dict[str, Any]:
     """Load configuration from a TOML file."""
     if not config_path.exists():
         return {}
-    
+
     try:
         with open(config_path, "rb") as f:
             return tomllib.load(f)
@@ -292,7 +295,7 @@ def get_config_paths() -> list[Path]:
     ]
 
 
-def load_toml_config_from_any_path() -> Dict[str, Any]:
+def load_toml_config_from_any_path() -> dict[str, Any]:
     """Load TOML configuration from the first available path."""
     for path in get_config_paths():
         if path.exists():
@@ -300,7 +303,7 @@ def load_toml_config_from_any_path() -> Dict[str, Any]:
             if config_data:
                 print(f"Loaded configuration from: {path}")
                 return config_data
-    
+
     print("No configuration file found, using defaults and environment variables")
     return {}
 
