@@ -1,6 +1,8 @@
 """Tests for data models."""
 
-from datetime import datetime
+from datetime import datetime, timezone
+
+from pydantic import HttpUrl
 
 from artfight_rss.models import ArtFightAttack, TeamStanding
 
@@ -12,62 +14,60 @@ def test_artfight_attack_creation():
         title="Test Attack",
         description="A test attack",
         attacker_user="attacker_user",
-        attacker_user="attacker_user",
-        fetched_at=datetime.now(),
-        url="https://artfight.net/attack/123"
+        defender_user="defender_user",
+        fetched_at=datetime.now(timezone.utc),
+        url=HttpUrl("https://artfight.net/attack/123")
     )
 
     assert attack.id == "test123"
     assert attack.title == "Test Attack"
     assert attack.attacker_user == "attacker_user"
-    assert attack.attacker_user == "attacker_user"
+    assert attack.defender_user == "defender_user"
 
 
-def test_artfight_attack_to_rss_item():
-    """Test converting ArtFightAttack to RSS item."""
+def test_artfight_attack_to_atom_item():
+    """Test converting ArtFightAttack to Atom item."""
     attack = ArtFightAttack(
         id="test123",
         title="Test Attack",
         description="A test attack",
         attacker_user="attacker_user",
-        attacker_user="attacker_user",
-        fetched_at=datetime(2023, 1, 1, 12, 0, 0),
-        url="https://artfight.net/attack/123"
+        defender_user="defender_user",
+        fetched_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        url=HttpUrl("https://artfight.net/attack/123")
     )
 
-    rss_item = attack.to_rss_item()
+    atom_item = attack.to_atom_item()
 
-    assert rss_item["title"] == "Attack on attacker_user by attacker_user"
-    assert rss_item["description"] == "A test attack"
-    assert rss_item["link"] == "https://artfight.net/attack/123"
-    assert rss_item["guid"] == "test123"
+    assert atom_item["title"] == "Test Attack"
+    assert atom_item["description"] == "A test attack"
+    assert atom_item["link"] == "https://artfight.net/attack/123"
+    assert atom_item["entry_id"] == "https://artfight.net/attack/123"
+    assert atom_item["author"] == "attacker_user"
 
 
 def test_team_standing_creation():
     """Test creating a TeamStanding."""
     standing = TeamStanding(
-        name="Test Team",
-        score=100,
-        side="attack",
-        last_switch=datetime.now()
+        team1_percentage=60.0,
+        fetched_at=datetime.now(timezone.utc),
+        leader_change=False
     )
 
-    assert standing.name == "Test Team"
-    assert standing.score == 100
-    assert standing.side == "attack"
+    assert standing.team1_percentage == 60.0
+    assert standing.leader_change == False
 
 
-def test_team_standing_to_rss_item():
-    """Test converting TeamStanding to RSS item."""
+def test_team_standing_to_atom_item():
+    """Test converting TeamStanding to Atom item."""
     standing = TeamStanding(
-        name="Test Team",
-        score=100,
-        side="attack",
-        last_switch=datetime(2023, 1, 1, 12, 0, 0)
+        team1_percentage=60.0,
+        fetched_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        leader_change=True
     )
 
-    rss_item = standing.to_rss_item()
+    atom_item = standing.to_atom_item()
 
-    assert rss_item["title"] == "Team Test Team Update"
-    assert "Score: 100" in rss_item["description"]
-    assert "Side: Attack" in rss_item["description"]
+    assert "Team Standings Update" in atom_item["title"]
+    assert "60.00000%" in atom_item["description"]
+    assert atom_item["author"] is None

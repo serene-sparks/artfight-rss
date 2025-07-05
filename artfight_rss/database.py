@@ -2,11 +2,33 @@
 
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, List, Optional
 
 from .models import ArtFightAttack, ArtFightDefense, TeamStanding
+
+
+def ensure_timezone_aware(dt: datetime) -> datetime:
+    """Ensure a datetime object is timezone-aware, assuming UTC if naive."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def validate_and_apply_limit(requested_limit: Optional[int]) -> Optional[int]:
+    """Validate and apply limit based on configuration."""
+    from .config import settings
+    
+    if requested_limit is None:
+        return settings.max_feed_items
+    
+    # Validate requested limit
+    if requested_limit < 1:
+        raise ValueError(f"Limit must be at least 1, got {requested_limit}")
+    
+    # Ensure the requested limit doesn't exceed the configured maximum
+    return min(requested_limit, settings.max_feed_items)
 
 
 class ArtFightDatabase:
@@ -86,7 +108,7 @@ class ArtFightDatabase:
         if not attacks:
             return
             
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         
         with sqlite3.connect(self.db_path) as conn:
             for attack in attacks:
@@ -114,7 +136,7 @@ class ArtFightDatabase:
         if not defenses:
             return
             
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         
         with sqlite3.connect(self.db_path) as conn:
             for defense in defenses:
@@ -172,6 +194,9 @@ class ArtFightDatabase:
         """Get attacks for multiple users, ordered by creation date (newest first)."""
         if not usernames:
             return []
+        
+        # Validate and apply limit
+        validated_limit = validate_and_apply_limit(limit)
             
         with sqlite3.connect(self.db_path) as conn:
             # Create placeholders for the IN clause
@@ -184,8 +209,8 @@ class ArtFightDatabase:
                 ORDER BY fetched_at DESC
             """
             
-            if limit:
-                query += f" LIMIT {limit}"
+            if validated_limit:
+                query += f" LIMIT {validated_limit}"
                 
             cursor = conn.execute(query, usernames)
             rows = cursor.fetchall()
@@ -195,8 +220,8 @@ class ArtFightDatabase:
                 (id_, title, description, image_url, attacker_user, attacker_user, 
                  fetched_at, url) = row
                 
-                # Parse datetime
-                fetched_dt = datetime.fromisoformat(fetched_at)
+                # Parse datetime and ensure timezone awareness
+                fetched_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
                 
                 # Convert URLs back to HttpUrl objects
                 from pydantic import HttpUrl, parse_obj_as
@@ -225,6 +250,9 @@ class ArtFightDatabase:
         """Get defenses for multiple users, ordered by creation date (newest first)."""
         if not usernames:
             return []
+        
+        # Validate and apply limit
+        validated_limit = validate_and_apply_limit(limit)
             
         with sqlite3.connect(self.db_path) as conn:
             # Create placeholders for the IN clause
@@ -237,8 +265,8 @@ class ArtFightDatabase:
                 ORDER BY fetched_at DESC
             """
             
-            if limit:
-                query += f" LIMIT {limit}"
+            if validated_limit:
+                query += f" LIMIT {validated_limit}"
                 
             cursor = conn.execute(query, usernames)
             rows = cursor.fetchall()
@@ -248,8 +276,8 @@ class ArtFightDatabase:
                 (id_, title, description, image_url, defender_user, attacker_user, 
                  fetched_at, url) = row
                 
-                # Parse datetime
-                fetched_dt = datetime.fromisoformat(fetched_at)
+                # Parse datetime and ensure timezone awareness
+                fetched_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
                 
                 # Convert URLs back to HttpUrl objects
                 from pydantic import HttpUrl, parse_obj_as
@@ -297,12 +325,12 @@ class ArtFightDatabase:
             )
             row = cursor.fetchone()
             if row:
-                return datetime.fromisoformat(row[0])
+                return ensure_timezone_aware(datetime.fromisoformat(row[0]))
             return None
 
     def set_rate_limit(self, key: str, min_interval: int) -> None:
         """Set rate limit for a key."""
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO rate_limits (key, last_request, min_interval)
@@ -364,7 +392,7 @@ class ArtFightDatabase:
         if not standings:
             return
             
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         
         with sqlite3.connect(self.db_path) as conn:
             # Get previous team1 percentage to detect leader changes
@@ -435,8 +463,8 @@ class ArtFightDatabase:
             if row:
                 (team1_percentage, fetched_at, leader_change) = row
                 
-                # Parse datetime
-                fetched_at_dt = datetime.fromisoformat(fetched_at)
+                # Parse datetime and ensure timezone awareness
+                fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
                 
                 standing = TeamStanding(
                     team1_percentage=team1_percentage,
@@ -449,6 +477,9 @@ class ArtFightDatabase:
 
     def get_team_standings_history(self, limit: Optional[int] = None) -> List[TeamStanding]:
         """Get team standings history, ordered by fetch time (newest first)."""
+        # Validate and apply limit
+        validated_limit = validate_and_apply_limit(limit)
+        
         with sqlite3.connect(self.db_path) as conn:
             query = """
                 SELECT team1_percentage, fetched_at, leader_change
@@ -456,8 +487,8 @@ class ArtFightDatabase:
                 ORDER BY fetched_at DESC
             """
             
-            if limit:
-                query += f" LIMIT {limit}"
+            if validated_limit:
+                query += f" LIMIT {validated_limit}"
                 
             cursor = conn.execute(query)
             rows = cursor.fetchall()
@@ -466,8 +497,8 @@ class ArtFightDatabase:
             for row in rows:
                 (team1_percentage, fetched_at, leader_change) = row
                 
-                # Parse datetime
-                fetched_at_dt = datetime.fromisoformat(fetched_at)
+                # Parse datetime and ensure timezone awareness
+                fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
                 
                 standing = TeamStanding(
                     team1_percentage=team1_percentage,
@@ -478,11 +509,14 @@ class ArtFightDatabase:
             
             return standings
 
-    def get_team_standing_changes(self, days: int = 30) -> List[TeamStanding]:
+    def get_team_standing_changes(self, days: int = 30, limit: Optional[int] = None) -> List[TeamStanding]:
         """Get team standing changes for RSS feed: last update of each day and all leader changes."""
+        # Validate and apply limit
+        validated_limit = validate_and_apply_limit(limit)
+        
         with sqlite3.connect(self.db_path) as conn:
             # Get standings from the last N days
-            cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+            cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
             
             # Get all standings from the last N days
             cursor = conn.execute("""
@@ -495,7 +529,7 @@ class ArtFightDatabase:
             all_standings = []
             for row in cursor.fetchall():
                 (team1_percentage, fetched_at, leader_change) = row
-                fetched_at_dt = datetime.fromisoformat(fetched_at)
+                fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
                 
                 standing = TeamStanding(
                     team1_percentage=team1_percentage,
@@ -540,5 +574,9 @@ class ArtFightDatabase:
             
             # Sort by fetched_at (newest first)
             unique_standings.sort(key=lambda s: s.fetched_at, reverse=True)
+            
+            # Apply limit if specified
+            if validated_limit:
+                unique_standings = unique_standings[:validated_limit]
             
             return unique_standings 

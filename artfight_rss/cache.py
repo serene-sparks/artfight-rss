@@ -2,9 +2,16 @@
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+def ensure_timezone_aware(dt: datetime) -> datetime:
+    """Ensure a datetime object is timezone-aware, assuming UTC if naive."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 class SQLiteCache:
@@ -50,10 +57,10 @@ class SQLiteCache:
                 return None
 
             data_str, timestamp_str, ttl = row
-            timestamp = datetime.fromisoformat(timestamp_str)
+            timestamp = ensure_timezone_aware(datetime.fromisoformat(timestamp_str))
 
             # Check if expired
-            age = (datetime.now() - timestamp).total_seconds()
+            age = (datetime.now(timezone.utc) - timestamp).total_seconds()
             if age > ttl:
                 # Remove expired entry
                 conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
@@ -65,7 +72,7 @@ class SQLiteCache:
     def set(self, key: str, data: Any, ttl: int) -> None:
         """Set value in cache with TTL."""
         data_str = self._serialize_data(data)
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
@@ -95,8 +102,8 @@ class SQLiteCache:
 
             for row in cursor.fetchall():
                 key, timestamp_str, ttl = row
-                timestamp = datetime.fromisoformat(timestamp_str)
-                age = (datetime.now() - timestamp).total_seconds()
+                timestamp = ensure_timezone_aware(datetime.fromisoformat(timestamp_str))
+                age = (datetime.now(timezone.utc) - timestamp).total_seconds()
 
                 if age > ttl:
                     expired_keys.append(key)
@@ -138,7 +145,7 @@ class RateLimiter:
         if last_request is None:
             return True
 
-        time_since_last = (datetime.now() - last_request).total_seconds()
+        time_since_last = (datetime.now(timezone.utc) - last_request).total_seconds()
         return time_since_last >= self.min_interval
 
     def record_request(self, key: str) -> None:

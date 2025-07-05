@@ -1,7 +1,7 @@
 """Background monitoring service for ArtFight team standings."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from .artfight import ArtFightClient
 from .cache import RateLimiter, SQLiteCache
@@ -77,7 +77,7 @@ class ArtFightMonitor:
         if not standings:
             return
 
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         should_update = False
 
         # Check for leader changes

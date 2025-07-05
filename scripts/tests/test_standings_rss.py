@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test script to verify the /rss/standings endpoint."""
+"""Test script to verify the /rss/standings endpoint (Atom feed)."""
 
 import asyncio
 import logging
@@ -10,7 +10,7 @@ from artfight_rss.cache import RateLimiter, SQLiteCache
 from artfight_rss.database import ArtFightDatabase
 from artfight_rss.config import settings
 from artfight_rss.models import TeamStanding
-from artfight_rss.rss import RSSGenerator
+from artfight_rss.rss import AtomGenerator
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -26,7 +26,7 @@ async def test_standings_rss():
     rate_limiter = RateLimiter(cache, settings.request_interval)
     database = ArtFightDatabase(db_path=settings.db_path)
     client = ArtFightClient(rate_limiter, database)
-    rss_gen = RSSGenerator()
+    atom_gen = AtomGenerator()
     
     try:
         print(f"\n📋 Configured Teams:")
@@ -148,29 +148,21 @@ async def test_standings_rss():
             change_type = "LEADER CHANGE" if standing.leader_change else "Daily Update"
             print(f"    {i+1}. {change_type}: {team1_name} {standing.team1_percentage:.2f}%, {team2_name} {100-standing.team1_percentage:.2f}% at {standing.fetched_at}")
         
-        # Test 2: Generate RSS feed
-        print(f"\n🔍 Test 2: Generate RSS feed")
+        # Test 2: Generate Atom feed
+        print(f"\n🔍 Test 2: Generate Atom feed")
         print("-" * 40)
         
-        feed = rss_gen.generate_team_changes_feed(changes)
-        print(f"  Feed title: {feed.title}")
-        print(f"  Feed description: {feed.description}")
-        print(f"  Feed items: {len(feed.items)}")
+        feed = atom_gen.generate_team_changes_feed(changes)
+        print(f"  Feed generated successfully")
         
-        # Show RSS items
-        for i, item in enumerate(feed.items[:5]):  # Show first 5 items
-            print(f"    {i+1}. {item['title']}")
-            print(f"       Description: {item['description']}")
-            print(f"       Date: {item['fetchDate']}")
-        
-        # Test 3: Generate RSS XML
-        print(f"\n🔍 Test 3: Generate RSS XML")
+        # Test 3: Generate Atom XML
+        print(f"\n🔍 Test 3: Generate Atom XML")
         print("-" * 40)
         
-        rss_xml = feed.to_rss_xml()
-        print(f"  RSS XML length: {len(rss_xml)} characters")
-        print(f"  RSS XML preview (first 500 chars):")
-        print(f"    {rss_xml[:500]}...")
+        atom_xml = feed.to_atom_xml()
+        print(f"  Atom XML length: {len(atom_xml)} characters")
+        print(f"  Atom XML preview (first 500 chars):")
+        print(f"    {atom_xml[:500]}...")
         
         # Test 4: Test with limited days
         print(f"\n🔍 Test 4: Test with limited days (last 2 days)")
@@ -194,7 +186,7 @@ async def test_standings_rss():
         print(f"  Team standing changes detection: ✅")
         print(f"  Daily last standing selection: ✅")
         print(f"  Leader change inclusion: ✅")
-        print(f"  RSS feed generation: ✅")
+        print(f"  Atom feed generation: ✅")
         print(f"  Deduplication: ✅")
         
         print("✅ /rss/standings endpoint is working correctly!")

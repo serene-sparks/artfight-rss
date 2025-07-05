@@ -17,6 +17,10 @@ host = "0.0.0.0"
 port = 8000
 debug = false
 
+# RSS feed settings
+max_users_per_feed = 5  # Maximum number of users allowed in a single multiuser feed
+max_feed_items = 50     # Maximum number of items returned in a feed
+
 # Whitelist of supported ArtFight profiles (optional)
 # If empty, all profiles are allowed
 whitelist = [

@@ -242,6 +242,23 @@ class Settings(BaseSettings):
     
     # RSS feed settings
     max_users_per_feed: int = Field(default=5, description="Maximum number of users allowed in a single multiuser feed")
+    max_feed_items: int = Field(default=50, description="Maximum number of items returned in a feed")
+
+    @field_validator('max_feed_items')
+    @classmethod
+    def validate_max_feed_items(cls, v):
+        """Validate that max_feed_items is at least 1."""
+        if v < 1:
+            raise ValueError(f"max_feed_items must be at least 1, got {v}")
+        return v
+
+    @field_validator('max_users_per_feed')
+    @classmethod
+    def validate_max_users_per_feed(cls, v):
+        """Validate that max_users_per_feed is at least 1."""
+        if v < 1:
+            raise ValueError(f"max_users_per_feed must be at least 1, got {v}")
+        return v
 
     # Database settings
     db_path: Path = Field(

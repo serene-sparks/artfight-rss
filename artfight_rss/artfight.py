@@ -3,7 +3,7 @@
 import html
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 import asyncio
 
@@ -362,7 +362,7 @@ class ArtFightClient:
             return False
         
         # Check if we have a valid cached result
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         if (self._auth_cache['last_check'] and 
             self._auth_cache['is_valid'] is not None and
             now - self._auth_cache['last_check'] < self._auth_cache['cache_duration']):
@@ -554,7 +554,7 @@ class ArtFightClient:
             else:
                 other_user = "Unknown"
 
-            fetched_at = datetime.now()
+            fetched_at = datetime.now(timezone.utc)
 
             if is_defense:
                 # For defenses: profile owner is defender, title contains attacker
@@ -683,7 +683,7 @@ class ArtFightClient:
         # Use team colors to determine which bar corresponds to which team
         team1_percentage = self._parse_team_percentage_by_color(progress_bars)
         if team1_percentage is not None:
-            fetched_at = datetime.now()
+            fetched_at = datetime.now(timezone.utc)
             
             standing = TeamStanding(
                 team1_percentage=team1_percentage,

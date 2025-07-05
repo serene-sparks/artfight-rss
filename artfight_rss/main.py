@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from .artfight import ArtFightClient
@@ -90,63 +90,27 @@ async def get_stats():
     return monitor.get_stats()
  
 
-@app.get("/rss/user/{username}/attacks")
-async def get_user_rss(username: str):
-    """Get RSS feed for a user's attacks."""
-    # Check if user is in whitelist
-    if settings.whitelist and username not in settings.whitelist:
-        raise HTTPException(status_code=404, detail="User not found")
 
-    # Get attacks for user
-    artfight_client = ArtFightClient(rate_limiter, database)
-    try:
-        attacks = await artfight_client.get_user_attacks(username)
-        feed = rss_generator.generate_user_feed(username, attacks)
-    finally:
-        await artfight_client.close()
-
-    return PlainTextResponse(
-        feed.to_rss_xml(),
-        media_type="application/rss+xml"
-    )
-
-
-@app.get("/rss/user/{username}/defenses")
-async def get_user_defense_rss(username: str):
-    """Get RSS feed for a user's defenses."""
-    # Check if user is in whitelist
-    if settings.whitelist and username not in settings.whitelist:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Get defenses for user
-    artfight_client = ArtFightClient(rate_limiter, database)
-    try:
-        defenses = await artfight_client.get_user_defenses(username)
-        feed = rss_generator.generate_user_defense_feed(username, defenses)
-    finally:
-        await artfight_client.close()
-
-    return PlainTextResponse(
-        feed.to_rss_xml(),
-        media_type="application/rss+xml"
-    )
 
 
 @app.get("/rss/standings")
-async def get_team_standings_changes_rss():
+async def get_team_standings_changes_rss(limit: int = Query(None, description="Maximum number of items to return")):
     """Get RSS feed for team standing changes (daily updates and leader changes)."""
-    # Get team standing changes from database
-    standings = database.get_team_standing_changes(days=30)
-    feed = rss_generator.generate_team_changes_feed(standings)
+    try:
+        # Get team standing changes from database with limit
+        standings = database.get_team_standing_changes(days=30, limit=limit)
+        feed = rss_generator.generate_team_changes_feed(standings)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return PlainTextResponse(
-        feed.to_rss_xml(),
-        media_type="application/rss+xml"
+        feed.to_atom_xml(),
+        media_type="application/atom+xml"
     )
 
 
 @app.get("/rss/attacks/{usernames}")
-async def get_multiuser_attacks_rss(usernames: str):
+async def get_multiuser_attacks_rss(usernames: str, limit: int = Query(None, description="Maximum number of items to return")):
     """Get RSS feed for multiple users' attacks."""
     # Parse usernames from URL (format: user1+user2+user3)
     username_list = usernames.split('+')
@@ -174,18 +138,21 @@ async def get_multiuser_attacks_rss(usernames: str):
                 detail=f"Users not found: {', '.join(invalid_users)}"
             )
 
-    # Get attacks for all users
-    attacks = database.get_attacks_for_users(username_list, limit=50)
-    feed = rss_generator.generate_multiuser_attacks_feed(username_list, attacks)
+    try:
+        # Get attacks for all users
+        attacks = database.get_attacks_for_users(username_list, limit=limit)
+        feed = rss_generator.generate_multiuser_attacks_feed(username_list, attacks)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return PlainTextResponse(
-        feed.to_rss_xml(),
-        media_type="application/rss+xml"
+        feed.to_atom_xml(),
+        media_type="application/atom+xml"
     )
 
 
 @app.get("/rss/defenses/{usernames}")
-async def get_multiuser_defenses_rss(usernames: str):
+async def get_multiuser_defenses_rss(usernames: str, limit: int = Query(None, description="Maximum number of items to return")):
     """Get RSS feed for multiple users' defenses."""
     # Parse usernames from URL (format: user1+user2+user3)
     username_list = usernames.split('+')
@@ -213,18 +180,21 @@ async def get_multiuser_defenses_rss(usernames: str):
                 detail=f"Users not found: {', '.join(invalid_users)}"
             )
 
-    # Get defenses for all users
-    defenses = database.get_defenses_for_users(username_list, limit=50)
-    feed = rss_generator.generate_multiuser_defenses_feed(username_list, defenses)
+    try:
+        # Get defenses for all users
+        defenses = database.get_defenses_for_users(username_list, limit=limit)
+        feed = rss_generator.generate_multiuser_defenses_feed(username_list, defenses)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return PlainTextResponse(
-        feed.to_rss_xml(),
-        media_type="application/rss+xml"
+        feed.to_atom_xml(),
+        media_type="application/atom+xml"
     )
 
 
 @app.get("/rss/combined/{usernames}")
-async def get_multiuser_combined_rss(usernames: str):
+async def get_multiuser_combined_rss(usernames: str, limit: int = Query(None, description="Maximum number of items to return")):
     """Get combined RSS feed for multiple users' attacks and defenses."""
     # Parse usernames from URL (format: user1+user2+user3)
     username_list = usernames.split('+')
@@ -252,14 +222,25 @@ async def get_multiuser_combined_rss(usernames: str):
                 detail=f"Users not found: {', '.join(invalid_users)}"
             )
 
-    # Get both attacks and defenses for all users
-    attacks = database.get_attacks_for_users(username_list, limit=25)
-    defenses = database.get_defenses_for_users(username_list, limit=25)
-    feed = rss_generator.generate_multiuser_combined_feed(username_list, attacks, defenses)
+    try:
+        # Get both attacks and defenses for all users
+        # For combined feeds, split the limit between attacks and defenses
+        if limit:
+            attack_limit = limit // 2
+            defense_limit = limit - attack_limit  # Ensure total doesn't exceed limit
+        else:
+            attack_limit = None
+            defense_limit = None
+        
+        attacks = database.get_attacks_for_users(username_list, limit=attack_limit)
+        defenses = database.get_defenses_for_users(username_list, limit=defense_limit)
+        feed = rss_generator.generate_multiuser_combined_feed(username_list, attacks, defenses)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     return PlainTextResponse(
-        feed.to_rss_xml(),
-        media_type="application/rss+xml"
+        feed.to_atom_xml(),
+        media_type="application/atom+xml"
     )
 
 
