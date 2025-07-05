@@ -188,28 +188,52 @@ class AtomGenerator:
             feed_id=feed_id
         )
 
-        # Add both attacks and defenses to feed
-        for attack in attacks:
-            feed.add_item(
-                title=attack.title,
-                description=attack.description or f"New attack: '{attack.title}' by {attack.attacker_user} on {attack.defender_user}.",
-                link=str(attack.url),
-                published=attack.fetched_at,
-                entry_id=str(attack.url),
-                author=attack.attacker_user,
-                image_url=str(attack.image_url) if attack.image_url else None
-            )
+        # Combine attacks and defenses and sort by publish date (newest first)
+        all_items = []
         
+        # Add attacks with type indicator
+        for attack in attacks:
+            all_items.append({
+                'type': 'attack',
+                'item': attack,
+                'fetched_at': attack.fetched_at
+            })
+        
+        # Add defenses with type indicator
         for defense in defenses:
-            feed.add_item(
-                title=defense.title,
-                description=defense.description or f"New defense: '{defense.title}' by {defense.attacker_user} on {defense.defender_user}.",
-                link=str(defense.url),
-                published=defense.fetched_at,
-                entry_id=str(defense.url),
-                author=defense.attacker_user,
-                image_url=str(defense.image_url) if defense.image_url else None
-            )
+            all_items.append({
+                'type': 'defense',
+                'item': defense,
+                'fetched_at': defense.fetched_at
+            })
+        
+        # Sort by fetched_at (newest first)
+        all_items.sort(key=lambda x: x['fetched_at'], reverse=True)
+        
+        # Add items to feed in chronological order
+        for item_data in all_items:
+            if item_data['type'] == 'attack':
+                attack = item_data['item']
+                feed.add_item(
+                    title=attack.title,
+                    description=attack.description or f"New attack: '{attack.title}' by {attack.attacker_user} on {attack.defender_user}.",
+                    link=str(attack.url),
+                    published=attack.fetched_at,
+                    entry_id=str(attack.url),
+                    author=attack.attacker_user,
+                    image_url=str(attack.image_url) if attack.image_url else None
+                )
+            else:  # defense
+                defense = item_data['item']
+                feed.add_item(
+                    title=defense.title,
+                    description=defense.description or f"New defense: '{defense.title}' by {defense.attacker_user} on {defense.defender_user}.",
+                    link=str(defense.url),
+                    published=defense.fetched_at,
+                    entry_id=str(defense.url),
+                    author=defense.attacker_user,
+                    image_url=str(defense.image_url) if defense.image_url else None
+                )
 
         return feed
 

@@ -24,7 +24,7 @@ class ArtFightAttack(BaseModel):
         """Convert to Atom item format."""
         return {
             "title": self.title,
-            "description": self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}. <img src='{self.image_url}' />",
+            "description": self.description or f"New attack: '{self.title}' by {self.attacker_user} on {self.defender_user}. ![Image]({self.image_url})",
             "link": str(self.url),
             "published": self.fetched_at,
             "entry_id": str(self.url),
@@ -49,7 +49,7 @@ class ArtFightDefense(BaseModel):
         """Convert to Atom item format."""
         return {
             "title": self.title,
-            "description": self.description or f"{self.attacker_user} attacked {self.defender_user} with '{self.title}'.<br/><img src='{self.image_url}' /><br/><a href='{self.url}'>View on ArtFight</a>",
+            "description": self.description or f"{self.attacker_user} attacked {self.defender_user} with '{self.title}'.\n\n![Image]({self.image_url})\n\n[View on ArtFight]({self.url})",
             "link": str(self.url),
             "published": self.fetched_at,
             "entry_id": str(self.url),
@@ -84,10 +84,10 @@ class TeamStanding(BaseModel):
         if self.leader_change:
             leader = team1_name if self.team1_percentage > 50 else team2_name
             title = f"Leader Change: {leader} takes the lead!"
-            description = f"{team1_name}: {self.team1_percentage:.5f}%, {team2_name}: {100-self.team1_percentage:.5f}%. <img src='{leader_image}' />"
+            description = f"{team1_name}: {self.team1_percentage:.5f}%, {team2_name}: {100-self.team1_percentage:.5f}%.\n\n![Image]({leader_image})"
         else:
             title = "Team Standings Update"
-            description = f"{team1_name}: {self.team1_percentage:.5f}%, {team2_name}: {100-self.team1_percentage:.5f}%. <img src='{leader_image}' />"
+            description = f"{team1_name}: {self.team1_percentage:.5f}%, {team2_name}: {100-self.team1_percentage:.5f}%.\n\n![Image]({leader_image})"
         
         return {
             "title": title,
@@ -142,8 +142,8 @@ class AtomFeed:
             fe.author(name=author)
         
         if image_url:
-            # Add image as content with HTML
-            fe.content(f'{description}<br/><img src="{image_url}" alt="Image" />', type='html')
+            # Add image as content with markdown
+            fe.content(f'{description}\n\n![Image]({image_url})', type='text/markdown')
 
     def to_atom_xml(self) -> str:
         """Convert to Atom XML format."""
