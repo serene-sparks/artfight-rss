@@ -2,7 +2,6 @@
 
 import asyncio
 import html
-import logging
 import re
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urljoin
@@ -14,10 +13,11 @@ from pydantic import HttpUrl, parse_obj_as
 from .cache import RateLimiter
 from .config import settings
 from .database import ArtFightDatabase
+from .logging_config import get_logger
 from .models import ArtFightAttack, ArtFightDefense, TeamStanding
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ArtFightClient:
@@ -36,7 +36,7 @@ class ArtFightClient:
             'cache_duration': timedelta(minutes=5)
         }
 
-        logger.debug(f"Initializing ArtFight client with base URL: {self.base_url}")
+        logger.info(f"Initializing ArtFight client with base URL: {self.base_url}")
 
         # Set up headers to match the working test exactly
         headers = {
@@ -85,7 +85,7 @@ class ArtFightClient:
             cookies=self.cookies
         )
 
-        logger.debug("ArtFight client initialized successfully")
+        logger.info("ArtFight client initialized successfully")
 
     def _log_request(self, method: str, url: str, **kwargs) -> None:
         """Log HTTP request details."""
@@ -181,7 +181,7 @@ class ArtFightClient:
 
     async def get_user_attacks(self, username: str) -> list[ArtFightAttack]:
         """Get attacks for a specific user with pagination."""
-        logger.debug(f"Fetching attacks for user: {username}")
+        logger.info(f"Fetching attacks for user: {username}")
 
         # Check rate limit
         if not self.rate_limiter.can_request(f"attacks_{username}"):
@@ -247,7 +247,7 @@ class ArtFightClient:
             # Record the request
             self.rate_limiter.record_request(f"attacks_{username}")
 
-            logger.debug(f"Successfully fetched {len(all_attacks)} attacks for user {username} across {page} pages")
+            logger.info(f"Successfully fetched {len(all_attacks)} attacks for user {username} across {page} pages")
             return all_attacks
 
         except httpx.HTTPError as e:
@@ -266,12 +266,12 @@ class ArtFightClient:
 
     async def get_user_defenses(self, username: str) -> list[ArtFightDefense]:
         """Get defenses for a specific user with pagination."""
-        logger.debug(f"Fetching defenses for user: {username}")
+        logger.info(f"Fetching defenses for user: {username}")
 
         # Check rate limit
         if not self.rate_limiter.can_request(f"defenses_{username}"):
             # Return existing data from database if rate limited
-            logger.debug(f"Rate limited for defenses_{username}, returning existing defenses from database")
+            logger.info(f"Rate limited for defenses_{username}, returning existing defenses from database")
             return self.database.get_defenses_for_user(username)
 
         try:
@@ -337,7 +337,7 @@ class ArtFightClient:
             # Record the request
             self.rate_limiter.record_request(f"defenses_{username}")
 
-            logger.debug(f"Successfully fetched {len(all_defenses)} defenses for user {username} across {page} pages")
+            logger.info(f"Successfully fetched {len(all_defenses)} defenses for user {username} across {page} pages")
             # return defenses from db
             return self.database.get_defenses_for_user(username)
 
@@ -614,7 +614,7 @@ class ArtFightClient:
         # Check rate limit
         if not self.rate_limiter.can_request("teams"):
             # Return existing data from database if rate limited
-            logger.debug("Rate limited for teams, returning existing standings from database")
+            logger.info("Rate limited for teams, returning existing standings from database")
             return self.database.get_team_standings()
 
         try:
@@ -625,7 +625,7 @@ class ArtFightClient:
 
             # Fetch teams page
             teams_url = urljoin(self.base_url, "/")
-            logger.debug("Fetching team standings")
+            logger.info("Fetching team standings")
             self._log_request("GET", teams_url, cookies=self.cookies)
 
             response = await self.client.get(teams_url)
@@ -643,7 +643,7 @@ class ArtFightClient:
             # Record the request
             self.rate_limiter.record_request("teams")
 
-            logger.debug(f"Successfully fetched {len(standings)} team standings")
+            logger.info(f"Successfully fetched {len(standings)} team standings")
             return standings
 
         except httpx.HTTPError as e:

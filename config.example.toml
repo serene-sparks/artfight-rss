@@ -27,6 +27,24 @@ whitelist = [
     "example_user"
 ]
 
+# Discord Bot Configuration
+discord_enabled = false  # Set to true to enable Discord bot functionality
+discord_token = ""       # Discord bot token (required for bot mode)
+discord_guild_id = 0     # Discord guild (server) ID for bot commands (optional)
+discord_channel_id = 0   # Discord channel ID for notifications (optional)
+discord_webhook_url = "" # Discord webhook URL for notifications (alternative to bot)
+
+# Discord notification settings
+discord_notify_attacks = true      # Send notifications for new attacks
+discord_notify_defenses = true     # Send notifications for new defenses
+discord_notify_team_changes = true # Send notifications for team standing changes
+discord_notify_leader_changes = true # Send notifications for leader changes
+
+# User monitoring configuration
+[[users]]
+username = "example_user"
+enabled = true
+
 [teams]
 team1 = { name = "Fossils", color = "#BA8C25", image_url = "https://images.artfight.net/2025/2025_Fossils.png" }
 team2 = { name = "Crystals", color = "#D35E88", image_url = "https://images.artfight.net/2025/2025_Crystals.png" }

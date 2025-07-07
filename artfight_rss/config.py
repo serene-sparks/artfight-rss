@@ -265,8 +265,46 @@ class Settings(BaseSettings):
 
     # Database settings
     db_path: Path = Field(
-        default=Path("data/artfight_data.db"),
-        description="Path to the permanent SQLite database"
+        default=Path("data/artfight.db"),
+        description="Path to SQLite database"
+    )
+
+    # Discord Bot settings
+    discord_enabled: bool = Field(
+        default=False,
+        description="Whether to enable Discord bot functionality"
+    )
+    discord_token: str | None = Field(
+        default=None,
+        description="Discord bot token"
+    )
+    discord_guild_id: int | None = Field(
+        default=None,
+        description="Discord guild (server) ID for bot commands"
+    )
+    discord_channel_id: int | None = Field(
+        default=None,
+        description="Discord channel ID for notifications"
+    )
+    discord_webhook_url: str | None = Field(
+        default=None,
+        description="Discord webhook URL for notifications (alternative to bot)"
+    )
+    discord_notify_attacks: bool = Field(
+        default=True,
+        description="Whether to send Discord notifications for new attacks"
+    )
+    discord_notify_defenses: bool = Field(
+        default=True,
+        description="Whether to send Discord notifications for new defenses"
+    )
+    discord_notify_team_changes: bool = Field(
+        default=True,
+        description="Whether to send Discord notifications for team standing changes"
+    )
+    discord_notify_leader_changes: bool = Field(
+        default=True,
+        description="Whether to send Discord notifications for leader changes"
     )
 
 

@@ -1,6 +1,8 @@
 """Main FastAPI application for the ArtFight RSS service."""
 
-import logging
+import asyncio
+import signal
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
@@ -10,32 +12,21 @@ from .artfight import ArtFightClient
 from .cache import RateLimiter, SQLiteCache
 from .config import settings
 from .database import ArtFightDatabase
+from .discord_bot import discord_bot
+from .logging_config import setup_logging, get_logger
 from .monitor import ArtFightMonitor
 from .rss import rss_generator
 
-# Configure logging based on debug setting
-if settings.debug:
-    # Configure logging for debug mode
-    logging.basicConfig(
-        level=logging.DEBUG,
-        handlers=[logging.StreamHandler()]
-    )
+# Set up logging configuration
+setup_logging()
+logger = get_logger(__name__)
 
-    # Set specific loggers to DEBUG level
-    logging.getLogger("artfight_rss").setLevel(logging.DEBUG)
-    logging.getLogger("artfight_rss.artfight").setLevel(logging.DEBUG)
-    logging.getLogger("artfight_rss.database").setLevel(logging.DEBUG)
-    logging.getLogger("artfight_rss.cache").setLevel(logging.DEBUG)
-    logging.getLogger("artfight_rss.monitor").setLevel(logging.DEBUG)
-    logging.getLogger("artfight_rss.rss").setLevel(logging.DEBUG)
-    logging.getLogger("artfight_rss.config").setLevel(logging.DEBUG)
+# Global instances
+cache: SQLiteCache
+rate_limiter: RateLimiter
+database: ArtFightDatabase
+monitor: ArtFightMonitor
 
-    print("Debug logging enabled for artfight_rss package")
-
-    logging.getLogger("httpcore").setLevel(logging.INFO)
-else:
-    # Basic INFO level logging for production
-    logging.basicConfig(level=logging.INFO)
 
 # Global instances
 cache: SQLiteCache
@@ -49,19 +40,35 @@ async def lifespan(app: FastAPI):
     """Manage application lifespan."""
     global cache, rate_limiter, database, monitor
 
+    logger.info("Starting ArtFight RSS service...")
+
     # Initialize components
+    logger.info("Initializing components...")
     cache = SQLiteCache(settings.cache_db_path)
     database = ArtFightDatabase(settings.db_path)
     rate_limiter = RateLimiter(database, settings.request_interval)
     monitor = ArtFightMonitor(cache, rate_limiter, database)
+    logger.info("Components initialized successfully")
 
     # Start monitoring
+    logger.info("Starting monitoring service...")
     await monitor.start()
+    logger.info("Monitoring service started")
 
+    # Start Discord bot
+    logger.info("Starting Discord bot...")
+    await discord_bot.start()
+    logger.info("Discord bot started")
+
+    logger.info("ArtFight RSS service started successfully")
+    
     yield
-
+    
     # Cleanup
+    logger.info("Shutting down ArtFight RSS service...")
+    await discord_bot.stop()
     await monitor.stop()
+    logger.info("ArtFight RSS service shutdown complete")
 
 
 # Create FastAPI app
@@ -301,6 +308,9 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         reload=settings.live_reload,
-        log_config=None,  # Prevent uvicorn from overriding our logging config
-        log_level=None    # Prevent uvicorn from resetting log level
+        log_config=None,  # Use our custom logging configuration
+        log_level=None,   # Let our logging config handle levels
+        access_log=True,  # Enable access logging
+        use_colors=True,  # Enable colored output
+        loop="asyncio"    # Use asyncio event loop for better signal handling
     )

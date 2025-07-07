@@ -261,6 +261,161 @@ For Discord RSS bots like [RSS Bot](https://github.com/DarkView/RSSCord) or simi
    URL: http://your-server:8000/rss/standings
    ```
 
+## Discord Bot Integration
+
+The service now includes direct Discord bot functionality with rich embed messages, eliminating the need for external RSS bots.
+
+### Features
+
+- **Rich Embed Messages**: Beautiful Discord embeds with images, colors, and formatted text
+- **Real-time Notifications**: Instant notifications for new attacks, defenses, and team changes
+- **Slash Commands**: Interactive bot commands for status and statistics
+- **Dual Mode Support**: Both bot token and webhook modes supported
+- **Configurable Notifications**: Enable/disable specific notification types
+- **User Monitoring**: Monitor specific users for new activity
+
+### Setup
+
+#### Option 1: Discord Bot Token (Recommended)
+
+1. **Create a Discord Application:**
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Click "New Application" and give it a name
+   - Go to the "Bot" section and click "Add Bot"
+   - Copy the bot token
+
+2. **Configure Bot Permissions:**
+   - In the Bot section, enable these permissions:
+     - Send Messages
+     - Use Slash Commands
+     - Embed Links
+     - Attach Files
+   - Copy the application ID for guild-specific commands
+
+3. **Invite Bot to Server:**
+   - Go to OAuth2 > URL Generator
+   - Select "bot" scope
+   - Select the permissions above
+   - Use the generated URL to invite the bot
+
+4. **Update Configuration:**
+   ```toml
+   # Discord Bot Configuration
+   discord_enabled = true
+   discord_token = "your_bot_token_here"
+   discord_guild_id = 123456789012345678  # Optional: for guild-specific commands
+   discord_channel_id = 123456789012345678  # Channel for notifications
+   
+   # Notification settings
+   discord_notify_attacks = true
+   discord_notify_defenses = true
+   discord_notify_team_changes = true
+   discord_notify_leader_changes = true
+   
+   # User monitoring
+   [[users]]
+   username = "example_user"
+   enabled = true
+   ```
+
+#### Option 2: Discord Webhook
+
+1. **Create Webhook:**
+   - In your Discord server, go to Server Settings > Integrations > Webhooks
+   - Click "New Webhook" and give it a name
+   - Copy the webhook URL
+
+2. **Update Configuration:**
+   ```toml
+   discord_enabled = true
+   discord_webhook_url = "https://discord.com/api/webhooks/..."
+   
+   # Notification settings
+   discord_notify_attacks = true
+   discord_notify_defenses = true
+   discord_notify_team_changes = true
+   discord_notify_leader_changes = true
+   ```
+
+### Bot Commands
+
+When using bot token mode, the following slash commands are available:
+
+- `/artfight stats` - Show bot statistics and status
+- `/artfight status` - Show bot configuration and settings
+- `/artfight teams` - Show current team standings
+- `/artfight help` - Show help and available commands
+
+### Notification Types
+
+#### Attack Notifications
+- **Trigger**: New attack detected for monitored users
+- **Content**: Attack title, attacker, defender, description, and image
+- **Color**: Red theme with attack emoji
+
+#### Defense Notifications
+- **Trigger**: New defense detected for monitored users
+- **Content**: Defense title, defender, attacker, description, and image
+- **Color**: Teal theme with shield emoji
+
+#### Team Standing Updates
+- **Trigger**: Regular team standing checks
+- **Content**: Current percentages, leading team, and team images
+- **Color**: Team-specific colors
+
+#### Leader Change Alerts
+- **Trigger**: When the leading team changes
+- **Content**: Special celebration message with team information
+- **Color**: Team-specific colors with crown emoji
+
+### Configuration Options
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `discord_enabled` | bool | false | Enable Discord bot functionality |
+| `discord_token` | string | null | Discord bot token (required for bot mode) |
+| `discord_guild_id` | int | null | Discord guild ID for guild-specific commands |
+| `discord_channel_id` | int | null | Discord channel ID for notifications |
+| `discord_webhook_url` | string | null | Discord webhook URL (alternative to bot) |
+| `discord_notify_attacks` | bool | true | Send notifications for new attacks |
+| `discord_notify_defenses` | bool | true | Send notifications for new defenses |
+| `discord_notify_team_changes` | bool | true | Send notifications for team changes |
+| `discord_notify_leader_changes` | bool | true | Send notifications for leader changes |
+
+### User Monitoring
+
+To monitor specific users for new attacks and defenses:
+
+```toml
+[[users]]
+username = "artist1"
+enabled = true
+
+[[users]]
+username = "artist2"
+enabled = true
+```
+
+The bot will check these users at the configured `request_interval` and send Discord notifications for any new activity.
+
+### Troubleshooting Discord Bot
+
+#### Bot Not Responding
+- Verify the bot token is correct
+- Check that the bot has proper permissions
+- Ensure the bot is online in your server
+
+#### No Notifications
+- Verify `discord_enabled = true` in config
+- Check notification settings are enabled
+- Ensure monitored users are configured
+- Check bot logs for errors
+
+#### Webhook Issues
+- Verify webhook URL is correct and not expired
+- Check webhook permissions in Discord
+- Ensure webhook is in the correct channel
+
 ## Team Standings Features
 
 ### Leader Change Detection
@@ -277,6 +432,95 @@ Automatically detects when the leading team changes and flags these events in th
 - Early termination for scraping
 - Configurable request delays with random wobble to avoid cloudflare detection. As much as this service is very kind to the ArtFight server, it's probably still not something they want. Please be kind to the server. Please.
 - Efficient pagination with smart caching
+
+## Logging and Monitoring
+
+### Logging Configuration
+
+The service uses a comprehensive logging system following FastAPI best practices:
+
+#### Log Levels
+- **DEBUG**: Detailed debugging information (headers, request/response content, parsing details)
+- **INFO**: Important activity tracking (service startup, user monitoring, data fetching)
+- **WARNING**: Non-critical issues (authentication failures, missing data)
+- **ERROR**: Critical errors that need attention
+
+#### Log Output
+- **Console**: Human-readable format with timestamps and log levels
+- **File**: Detailed format with module names and line numbers
+- **Error File**: Separate file for ERROR level messages only
+
+#### Log Files
+- `logs/artfight-rss.log` - All log messages with detailed formatting
+- `logs/artfight-rss-error.log` - Error messages only
+
+#### Configuration
+Logging is automatically configured based on the `debug` setting in your config:
+- `debug = true`: DEBUG level for application modules, INFO for HTTP clients
+- `debug = false`: INFO level for application modules, WARNING for HTTP clients
+
+#### Testing Logging
+```bash
+# Test the logging configuration
+python scripts/test_logging.py
+```
+
+#### Testing Shutdown Handling
+```bash
+# Test shutdown handling
+python scripts/test_shutdown.py
+
+# Test server startup and shutdown
+python scripts/test_server_shutdown.py
+```
+
+### Graceful Shutdown
+
+The service supports graceful shutdown with proper signal handling:
+
+- **Ctrl+C (SIGINT)**: Graceful shutdown with cleanup
+- **SIGTERM**: Graceful shutdown for systemd services
+- **Timeout Protection**: 5-second timeout for component shutdown
+- **Background Task Cleanup**: Proper cancellation of monitoring loops
+- **Discord Bot**: Proper startup and shutdown with timeout protection
+- **FastAPI Lifespan**: Uses FastAPI's lifespan context manager for proper startup/shutdown
+
+#### Shutdown Behavior
+- **Immediate Response**: The server responds to Ctrl+C within 1-2 seconds
+- **Clean Cancellation**: Background tasks are cancelled gracefully
+- **Discord Bot**: Bot startup and shutdown are handled with proper timeout protection
+- **Monitor Loops**: Team monitoring loops are cancelled and cleaned up
+
+#### Testing Shutdown
+```bash
+# Test automatic shutdown after 10 seconds
+uv run python scripts/test_shutdown.py
+
+# Test server shutdown handling
+uv run python scripts/test_server_shutdown.py
+
+# Test manual server startup and shutdown
+uv run python scripts/test_manual_shutdown.py
+```
+
+#### Manual Testing
+To test shutdown manually:
+1. Start the server: `uv run python -m artfight_rss.main`
+2. Wait for startup to complete (Discord bot login, etc.)
+3. Press Ctrl+C in the terminal
+4. The server should shut down gracefully within 3-5 seconds
+
+### Health Checks
+```bash
+# Check if service is running
+curl http://localhost:8000/health
+
+# Check authentication status
+curl http://localhost:8000/auth/status
+
+# View statistics
+curl http://localhost:8000/stats
+```
 
 ## Architecture
 
