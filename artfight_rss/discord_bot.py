@@ -42,11 +42,26 @@ class ArtFightDiscordBot:
                 # Start bot in background task to avoid blocking
                 import asyncio
                 self.bot_task = asyncio.create_task(self._start_bot())
+                
+                # Wait for the bot to be ready with timeout
+                startup_timeout = float(settings.discord_startup_timeout)
+                logger.info(f"Waiting for Discord bot to be ready (timeout: {startup_timeout}s)...")
+                await asyncio.wait_for(self.ready_event.wait(), timeout=startup_timeout)
+                logger.info("Discord bot is ready and operational")
+                
             elif settings.discord_webhook_url:
                 await self._start_webhook()
 
             self.running = True
             logger.info("Discord bot started successfully")
+        except asyncio.TimeoutError:
+            logger.error(f"Discord bot failed to become ready within {settings.discord_startup_timeout}s")
+            logger.error("This may be due to:")
+            logger.error("- Invalid bot token")
+            logger.error("- Bot not added to server")
+            logger.error("- Incorrect permissions")
+            logger.error("- Network connectivity issues")
+            raise
         except Exception as e:
             logger.error(f"Failed to start Discord bot: {e}")
             raise
@@ -129,22 +144,15 @@ class ArtFightDiscordBot:
         if not settings.discord_token:
             raise ValueError("Discord token is required for bot mode")
         
-        # Start the bot in a way that can be cancelled
+        # Start the bot (no timeout here, handled at higher level)
         try:
-            # Use configurable timeout for remote servers with slower connections
-            startup_timeout = float(settings.discord_startup_timeout)
-            logger.info(f"Starting Discord bot with {startup_timeout}s timeout...")
-            await asyncio.wait_for(self.bot.start(settings.discord_token), timeout=startup_timeout)
+            logger.info("Starting Discord bot...")
+            await self.bot.start(settings.discord_token)
         except asyncio.CancelledError:
             logger.info("Discord bot startup cancelled")
             raise
-        except asyncio.TimeoutError:
-            logger.error(f"Discord bot startup timed out after {startup_timeout}s")
-            logger.error("This may be due to:")
-            logger.error("- Slow network connection on remote server")
-            logger.error("- Discord API rate limiting")
-            logger.error("- Firewall or proxy issues")
-            logger.error("- Discord service issues")
+        except Exception as e:
+            logger.error(f"Discord bot startup failed: {e}")
             raise
 
     async def _start_webhook(self):

@@ -57,10 +57,41 @@ async def debug_discord_timeout():
         
         start_time = time.time()
         
+        # Create a task for the bot startup
+        bot_task = asyncio.create_task(bot.start(settings.discord_token))
+        
         try:
-            # Try to start the bot with the current timeout
-            print(f"Attempting to connect with {timeout}s timeout...")
-            await asyncio.wait_for(bot.start(settings.discord_token), timeout=timeout)
+            # Wait for either the bot to be ready or timeout
+            print(f"Attempting to connect and become ready with {timeout}s timeout...")
+            
+            # Wait for the ready event (which means bot is fully operational)
+            await asyncio.wait_for(ready_event.wait(), timeout=timeout)
+            
+            elapsed = time.time() - start_time
+            print(f"✅ Success! Bot ready in {elapsed:.1f}s")
+            print("✅ Bot is ready and operational!")
+            
+            # Test sending a message
+            if settings.discord_channel_id:
+                target_channel = None
+                for guild in bot.guilds:
+                    for channel in guild.text_channels:
+                        if channel.id == settings.discord_channel_id:
+                            target_channel = channel
+                            break
+                    if target_channel:
+                        break
+                
+                if target_channel:
+                    try:
+                        await target_channel.send("🔧 **Timeout Debug Test**\nBot is working correctly!")
+                        print("✅ Test message sent successfully!")
+                    except Exception as e:
+                        print(f"❌ Failed to send test message: {e}")
+                else:
+                    print("⚠️ Target channel not found")
+            
+            break  # Success, no need to test longer timeouts
             
         except asyncio.TimeoutError:
             elapsed = time.time() - start_time
@@ -70,46 +101,20 @@ async def debug_discord_timeout():
             print("- Discord API rate limiting")
             print("- Firewall/proxy issues")
             print("- Discord service issues")
+            print("- Bot not added to server or invalid token")
             
         except Exception as e:
             elapsed = time.time() - start_time
             print(f"❌ Error after {elapsed:.1f}s: {e}")
             
-        else:
-            elapsed = time.time() - start_time
-            print(f"✅ Success! Connected in {elapsed:.1f}s")
-            
-            # Wait for ready event
-            try:
-                await asyncio.wait_for(ready_event.wait(), timeout=10.0)
-                print("✅ Bot is ready and operational!")
-                
-                # Test sending a message
-                if settings.discord_channel_id:
-                    target_channel = None
-                    for guild in bot.guilds:
-                        for channel in guild.text_channels:
-                            if channel.id == settings.discord_channel_id:
-                                target_channel = channel
-                                break
-                        if target_channel:
-                            break
-                    
-                    if target_channel:
-                        try:
-                            await target_channel.send("🔧 **Timeout Debug Test**\nBot is working correctly!")
-                            print("✅ Test message sent successfully!")
-                        except Exception as e:
-                            print(f"❌ Failed to send test message: {e}")
-                    else:
-                        print("⚠️ Target channel not found")
-                
-                break  # Success, no need to test longer timeouts
-                
-            except asyncio.TimeoutError:
-                print("❌ Bot connected but didn't become ready within 10s")
-                
         finally:
+            # Cancel the bot task and close the bot
+            bot_task.cancel()
+            try:
+                await asyncio.wait_for(bot_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+            
             try:
                 await bot.close()
             except:
