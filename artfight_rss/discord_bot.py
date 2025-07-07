@@ -427,12 +427,12 @@ class ArtFightDiscordBot:
 
         embed.add_field(
             name=team1_name,
-            value=f"{standing.team1_percentage:.2f}%",
+            value=f"{standing.team1_percentage:.5f}%",
             inline=True
         )
         embed.add_field(
             name=team2_name,
-            value=f"{100 - standing.team1_percentage:.2f}%",
+            value=f"{100 - standing.team1_percentage:.5f}%",
             inline=True
         )
 
@@ -466,19 +466,13 @@ class ArtFightDiscordBot:
 
         embed.add_field(
             name=team1_name,
-            value=f"{standing.team1_percentage:.2f}%",
+            value=f"{standing.team1_percentage:.5f}%",
             inline=True
         )
         embed.add_field(
             name=team2_name,
-            value=f"{100 - standing.team1_percentage:.2f}%",
+            value=f"{100 - standing.team1_percentage:.5f}%",
             inline=True
-        )
-
-        embed.add_field(
-            name="🎉",
-            value=f"Congratulations to **{new_leader}** for taking the lead!",
-            inline=False
         )
 
         if settings.teams:
