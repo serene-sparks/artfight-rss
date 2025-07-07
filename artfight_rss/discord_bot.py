@@ -131,12 +131,20 @@ class ArtFightDiscordBot:
         
         # Start the bot in a way that can be cancelled
         try:
-            await asyncio.wait_for(self.bot.start(settings.discord_token), timeout=30.0)
+            # Use configurable timeout for remote servers with slower connections
+            startup_timeout = float(settings.discord_startup_timeout)
+            logger.info(f"Starting Discord bot with {startup_timeout}s timeout...")
+            await asyncio.wait_for(self.bot.start(settings.discord_token), timeout=startup_timeout)
         except asyncio.CancelledError:
             logger.info("Discord bot startup cancelled")
             raise
         except asyncio.TimeoutError:
-            logger.error("Discord bot startup timed out")
+            logger.error(f"Discord bot startup timed out after {startup_timeout}s")
+            logger.error("This may be due to:")
+            logger.error("- Slow network connection on remote server")
+            logger.error("- Discord API rate limiting")
+            logger.error("- Firewall or proxy issues")
+            logger.error("- Discord service issues")
             raise
 
     async def _start_webhook(self):

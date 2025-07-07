@@ -39,6 +39,7 @@ discord_notify_attacks = true      # Send notifications for new attacks
 discord_notify_defenses = true     # Send notifications for new defenses
 discord_notify_team_changes = true # Send notifications for team standing changes
 discord_notify_leader_changes = true # Send notifications for leader changes
+discord_startup_timeout = 120      # Discord bot startup timeout in seconds (increase for remote servers)
 
 # User monitoring configuration
 [[users]]

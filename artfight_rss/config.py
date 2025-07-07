@@ -306,6 +306,10 @@ class Settings(BaseSettings):
         default=True,
         description="Whether to send Discord notifications for leader changes"
     )
+    discord_startup_timeout: int = Field(
+        default=120,
+        description="Discord bot startup timeout in seconds (default: 120 for remote servers)"
+    )
 
 
 def load_toml_config(config_path: Path) -> dict[str, Any]:

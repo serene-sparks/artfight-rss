@@ -411,6 +411,21 @@ The bot will check these users at the configured `request_interval` and send Dis
 - Ensure monitored users are configured
 - Check bot logs for errors
 
+#### Bot Startup Timeout (Remote Servers)
+If you're getting "Discord bot startup timed out" errors on remote servers:
+
+1. **Increase timeout**: Set `discord_startup_timeout = 300` in your config (5 minutes)
+2. **Test connectivity**: Run `python scripts/debug_discord_timeout.py`
+3. **Check network**: Ensure server can reach Discord API (no firewall/proxy blocking)
+4. **Rate limiting**: Discord may rate limit connections from new IPs
+5. **Alternative**: Use webhook mode instead of bot mode for notifications
+
+Common causes:
+- Slow network connections on remote servers
+- Discord API rate limiting for new connections
+- Firewall or proxy blocking Discord connections
+- Discord service issues
+
 #### Webhook Issues
 - Verify webhook URL is correct and not expired
 - Check webhook permissions in Discord
