@@ -29,13 +29,6 @@ database: ArtFightDatabase
 monitor: ArtFightMonitor
 
 
-# Global instances
-cache: SQLiteCache
-rate_limiter: RateLimiter
-database: ArtFightDatabase
-monitor: ArtFightMonitor
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan."""
@@ -148,6 +141,9 @@ async def get_multiuser_attacks_rss(usernames: str, limit: int = Query(None, des
             )
 
     try:
+        # Fetch fresh data and emit events
+        await fetch_and_emit_events_for_users(username_list)
+        
         # Get attacks for all users
         attacks = database.get_attacks_for_users(username_list, limit=limit)
         feed = rss_generator.generate_multiuser_attacks_feed(username_list, attacks)
@@ -190,6 +186,9 @@ async def get_multiuser_defenses_rss(usernames: str, limit: int = Query(None, de
             )
 
     try:
+        # Fetch fresh data and emit events
+        await fetch_and_emit_events_for_users(username_list)
+        
         # Get defenses for all users
         defenses = database.get_defenses_for_users(username_list, limit=limit)
         feed = rss_generator.generate_multiuser_defenses_feed(username_list, defenses)
@@ -232,6 +231,9 @@ async def get_multiuser_combined_rss(usernames: str, limit: int = Query(None, de
             )
 
     try:
+        # Fetch fresh data and emit events
+        await fetch_and_emit_events_for_users(username_list)
+        
         # Get both attacks and defenses for all users
         # For combined feeds, split the limit between attacks and defenses
         if limit:
@@ -304,6 +306,46 @@ async def get_auth_status():
         }
     finally:
         await artfight_client.close()
+
+
+async def fetch_and_emit_events_for_user(username: str) -> None:
+    """Fetch fresh data for a user and emit events for new items."""
+    try:
+        # Fetch fresh attacks and emit events for new ones
+        previous_attack_ids = database.get_existing_attack_ids(username)
+        attacks = await monitor.artfight_client.get_user_attacks(username)
+        if attacks:
+            current_attack_ids = {attack.id for attack in attacks}
+            new_attack_ids = current_attack_ids - previous_attack_ids
+            if new_attack_ids:
+                logger.info(f"RSS access found {len(new_attack_ids)} new attacks for {username}")
+                for attack in attacks:
+                    if attack.id in new_attack_ids:
+                        await monitor.emit_event('new_attack', attack)
+
+        # Fetch fresh defenses and emit events for new ones
+        previous_defense_ids = database.get_existing_defense_ids(username)
+        defenses = await monitor.artfight_client.get_user_defenses(username)
+        if defenses:
+            current_defense_ids = {defense.id for defense in defenses}
+            new_defense_ids = current_defense_ids - previous_defense_ids
+            if new_defense_ids:
+                logger.info(f"RSS access found {len(new_defense_ids)} new defenses for {username}")
+                for defense in defenses:
+                    if defense.id in new_defense_ids:
+                        await monitor.emit_event('new_defense', defense)
+
+    except Exception as e:
+        logger.error(f"Error fetching and emitting events for {username}: {e}")
+
+
+async def fetch_and_emit_events_for_users(usernames: list[str]) -> None:
+    """Fetch fresh data for multiple users and emit events for new items."""
+    for username in usernames:
+        await fetch_and_emit_events_for_user(username)
+
+
+
 
 
 if __name__ == "__main__":

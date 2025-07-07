@@ -179,25 +179,28 @@ class ArtFightClient:
             # Clear authentication cache since cookies changed
             self.clear_auth_cache()
 
-    async def get_user_attacks(self, username: str) -> list[ArtFightAttack]:
-        """Get attacks for a specific user with pagination."""
-        logger.info(f"Fetching attacks for user: {username}")
+    async def _fetch_user_content(self, username: str, content_type: str) -> list:
+        """Shared method for fetching attacks or defenses with pagination."""
+        logger.info(f"Fetching {content_type} for user: {username}")
 
         # Check rate limit
-        if not self.rate_limiter.can_request(f"attacks_{username}"):
+        if not self.rate_limiter.can_request(f"{content_type}_{username}"):
             # Return existing data from database if rate limited
-            logger.debug(f"Rate limited for attacks_{username}, returning existing attacks from database")
-            return self.database.get_attacks_for_user(username)
+            logger.info(f"Rate limited for {content_type}_{username}, returning existing {content_type} from database")
+            if content_type == "attacks":
+                return self.database.get_attacks_for_user(username)
+            else:
+                return self.database.get_defenses_for_user(username)
 
         try:
             # Check authentication first if session cookie is provided
             if settings.laravel_session and not await self.validate_authentication():
-                logger.warning("Authentication failed for attacks - session cookie may be invalid")
+                logger.warning(f"Authentication failed for {content_type} - session cookie may be invalid")
                 return []
 
-            all_attacks = []
+            all_items = []
             page = 1
-            base_url = urljoin(self.base_url, f"/~{username}/attacks")
+            base_url = urljoin(self.base_url, f"/~{username}/{content_type}")
 
             while True:
                 # Construct URL for current page
@@ -206,24 +209,37 @@ class ArtFightClient:
                 else:
                     page_url = f"{base_url}?page={page}"
 
-                logger.debug(f"Fetching attacks page {page}: {page_url}")
+                logger.debug(f"Fetching {content_type} page {page}: {page_url}")
                 self._log_request("GET", page_url, cookies=self.cookies)
 
                 response = await self.client.get(page_url)
                 self._log_response(response)
                 response.raise_for_status()
 
-                # Parse attacks from the page
-                logger.debug(f"Parsing attacks from HTML (content length: {len(response.text)})")
-                page_attacks = self._parse_attacks_from_html(response.text, username)
+                # Parse items from the page
+                logger.debug(f"Parsing {content_type} from HTML (content length: {len(response.text)})")
+                if content_type == "attacks":
+                    page_items = self._parse_attacks_from_html(response.text, username)
+                else:
+                    page_items = self._parse_defenses_from_html(response.text, username)
 
-                logger.debug(f"Found {len(page_attacks)} attacks on page {page}")
-                all_attacks.extend(page_attacks)
+                logger.debug(f"Found {len(page_items)} {content_type} on page {page}")
 
-                # If no attacks found on first page, stop pagination
-                if page == 1 and not page_attacks:
-                    logger.debug("No attacks found on first page, stopping pagination")
+                # Check for new items
+                if content_type == "attacks":
+                    existing_ids = self.database.get_existing_attack_ids(username)
+                else:
+                    existing_ids = self.database.get_existing_defense_ids(username)
+                
+                new_items = [item for item in page_items if item.id not in existing_ids]
+                logger.debug(f"Found {len(new_items)} new {content_type} out of {len(page_items)} total on first page")
+
+                # If no new items found on first page, stop pagination
+                if not new_items:
+                    logger.debug(f"No new {content_type} found, stopping pagination")
                     break
+
+                all_items.extend(page_items)
 
                 # Check if there's a next page
                 if not self._has_next_page(response.text):
@@ -240,18 +256,25 @@ class ArtFightClient:
                     logger.warning(f"Reached maximum page limit ({page}), stopping pagination")
                     break
 
-            # Save attacks to database
-            if all_attacks:
-                self.database.save_attacks(all_attacks)
+            # Save items to database
+            if all_items:
+                if content_type == "attacks":
+                    self.database.save_attacks(all_items)
+                else:
+                    self.database.save_defenses(all_items)
 
             # Record the request
-            self.rate_limiter.record_request(f"attacks_{username}")
+            self.rate_limiter.record_request(f"{content_type}_{username}")
 
-            logger.info(f"Successfully fetched {len(all_attacks)} attacks for user {username} across {page} pages")
-            return all_attacks
+            logger.info(f"Successfully fetched {len(all_items)} {content_type} for user {username} across {page} pages")
+            # return items from db
+            if content_type == "attacks":
+                return self.database.get_attacks_for_user(username)
+            else:
+                return self.database.get_defenses_for_user(username)
 
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error fetching attacks for {username}: {e}")
+            logger.error(f"HTTP error fetching {content_type} for {username}: {e}")
             # Try to get response from the exception
             try:
                 response = getattr(e, 'response', None)
@@ -261,99 +284,16 @@ class ArtFightClient:
                 pass
             return []
         except Exception as e:
-            logger.error(f"Unexpected error fetching attacks for {username}: {e}")
+            logger.error(f"Unexpected error fetching {content_type} for {username}: {e}")
             return []
+
+    async def get_user_attacks(self, username: str) -> list[ArtFightAttack]:
+        """Get attacks for a specific user with pagination."""
+        return await self._fetch_user_content(username, "attacks")
 
     async def get_user_defenses(self, username: str) -> list[ArtFightDefense]:
         """Get defenses for a specific user with pagination."""
-        logger.info(f"Fetching defenses for user: {username}")
-
-        # Check rate limit
-        if not self.rate_limiter.can_request(f"defenses_{username}"):
-            # Return existing data from database if rate limited
-            logger.info(f"Rate limited for defenses_{username}, returning existing defenses from database")
-            return self.database.get_defenses_for_user(username)
-
-        try:
-            # Check authentication first if session cookie is provided
-            if settings.laravel_session and not await self.validate_authentication():
-                logger.warning("Authentication failed for defenses - session cookie may be invalid")
-                return []
-
-            all_defenses = []
-            page = 1
-            base_url = urljoin(self.base_url, f"/~{username}/defenses")
-
-            while True:
-                # Construct URL for current page
-                if page == 1:
-                    page_url = base_url
-                else:
-                    page_url = f"{base_url}?page={page}"
-
-                logger.debug(f"Fetching defenses page {page}: {page_url}")
-                self._log_request("GET", page_url, cookies=self.cookies)
-
-                response = await self.client.get(page_url)
-                self._log_response(response)
-                response.raise_for_status()
-
-                # Parse defenses from the page
-                logger.debug(f"Parsing defenses from HTML (content length: {len(response.text)})")
-                page_defenses = self._parse_defenses_from_html(response.text, username)
-
-                logger.debug(f"Found {len(page_defenses)} defenses on page {page}")
-
-                existing_defense_ids = self.database.get_existing_defense_ids(username)
-                new_defenses = [d for d in page_defenses if d.id not in existing_defense_ids]
-                logger.debug(f"Found {len(new_defenses)} new defenses out of {len(page_defenses)} total on first page")
-
-                # If no new defenses found on first page, stop pagination
-                if not new_defenses:
-                    logger.debug("No new defenses found, stopping pagination")
-                    break
-
-                all_defenses.extend(page_defenses)
-
-                # Check if there's a next page
-                if not self._has_next_page(response.text):
-                    logger.debug(f"No more pages found, stopping at page {page}")
-                    break
-
-                # Add delay before next page request
-                if page < 10:  # Limit to reasonable number of pages
-                    delay = self._calculate_page_delay()
-                    logger.debug(f"Waiting {delay:.2f} seconds before next page request")
-                    await asyncio.sleep(delay)
-                    page += 1
-                else:
-                    logger.warning(f"Reached maximum page limit ({page}), stopping pagination")
-                    break
-
-            # Save defenses to database
-            if all_defenses:
-                self.database.save_defenses(all_defenses)
-
-            # Record the request
-            self.rate_limiter.record_request(f"defenses_{username}")
-
-            logger.info(f"Successfully fetched {len(all_defenses)} defenses for user {username} across {page} pages")
-            # return defenses from db
-            return self.database.get_defenses_for_user(username)
-
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error fetching defenses for {username}: {e}")
-            # Try to get response from the exception
-            try:
-                response = getattr(e, 'response', None)
-                if response:
-                    self._log_response(response)
-            except Exception:
-                pass
-            return []
-        except Exception as e:
-            logger.error(f"Unexpected error fetching defenses for {username}: {e}")
-            return []
+        return await self._fetch_user_content(username, "defenses")
 
     async def validate_authentication(self) -> bool:
         """Validate that the session cookie is still valid with 5-minute caching."""
