@@ -13,6 +13,7 @@ from .cache import RateLimiter, SQLiteCache
 from .config import settings
 from .database import ArtFightDatabase
 from .discord_bot import discord_bot
+from .event_handlers import setup_event_handlers
 from .logging_config import setup_logging, get_logger
 from .monitor import ArtFightMonitor
 from .rss import rss_generator
@@ -54,6 +55,11 @@ async def lifespan(app: FastAPI):
     logger.info("Starting monitoring service...")
     await monitor.start()
     logger.info("Monitoring service started")
+
+    # Set up event handlers
+    logger.info("Setting up event handlers...")
+    setup_event_handlers(monitor)
+    logger.info("Event handlers set up")
 
     # Start Discord bot
     logger.info("Starting Discord bot...")
