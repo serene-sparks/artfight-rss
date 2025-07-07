@@ -17,13 +17,6 @@ except ImportError:
     import tomli as tomllib
 
 
-class UserConfig(BaseModel):
-    """Configuration for a single user to monitor."""
-
-    username: str = Field(..., description="ArtFight username")
-    enabled: bool = Field(default=True, description="Whether to monitor this user")
-
-
 class TeamConfig(BaseModel):
     """Configuration for a team in ArtFight."""
 
@@ -63,9 +56,9 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
         if value is None:
             return None
 
-        if field_name == "users" and isinstance(value, list):
-            # Handle users list - convert dicts to UserConfig objects
-            return [UserConfig(**user) for user in value]
+        if field_name == "monitor_list" and isinstance(value, list):
+            # Handle monitor_list - already a list of strings
+            return value
         elif field_name == "teams" and isinstance(value, dict):
             # Handle teams configuration - convert to TeamSettings object
             return TeamSettings(**value)
@@ -97,10 +90,10 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
                     processed_data = {}
 
                     for key, value in config_data.items():
-                        if key == "users":
-                            # Handle users list - convert dicts to UserConfig objects
-                            processed_data["users"] = [UserConfig(**user) for user in value]
-                            print(f"  Processed {len(value)} users")
+                        if key == "monitor_list":
+                            # Handle monitor_list - already a list of strings
+                            processed_data["monitor_list"] = value
+                            print(f"  Processed {len(value)} monitored users")
                         elif key == "teams":
                             # Handle teams configuration - convert to TeamSettings object
                             processed_data["teams"] = TeamSettings(**value)
@@ -178,14 +171,14 @@ class Settings(BaseSettings):
     )
 
     # User monitoring
-    users: list[UserConfig] = Field(
+    monitor_list: list[str] = Field(
         default_factory=list,
-        description="List of users to monitor"
+        description="List of usernames to automatically monitor for new attacks/defenses"
     )
 
     whitelist: list[str] = Field(
         default_factory=list,
-        description="List of supported ArtFight profiles"
+        description="List of allowed ArtFight profiles that can be requested via RSS feeds"
     )
 
     # Team configuration

@@ -48,7 +48,7 @@ class ArtFightMonitor:
         self.team_task = asyncio.create_task(self._team_monitor_loop())
 
         # Start background task for user monitoring if users are configured
-        if settings.users:
+        if settings.monitor_list:
             self.user_task = asyncio.create_task(self._user_monitor_loop())
             logger.info("ArtFight team and user monitor started")
         else:
@@ -200,14 +200,10 @@ class ArtFightMonitor:
 
     async def _check_user_activity(self) -> None:
         """Check user activity for new attacks and defenses."""
-        if not settings.users:
+        if not settings.monitor_list:
             return
 
-        for user_config in settings.users:
-            if not user_config.enabled:
-                continue
-
-            username = user_config.username
+        for username in settings.monitor_list:
             logger.info(f"Checking activity for user: {username}")
 
             try:

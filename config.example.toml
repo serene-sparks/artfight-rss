@@ -42,9 +42,9 @@ discord_notify_leader_changes = true # Send notifications for leader changes
 discord_startup_timeout = 120      # Discord bot startup timeout in seconds (increase for remote servers)
 
 # User monitoring configuration
-[[users]]
-username = "example_user"
-enabled = true
+monitor_list = [
+    "example_user"
+]
 
 [teams]
 team1 = { name = "Fossils", color = "#BA8C25", image_url = "https://images.artfight.net/2025/2025_Fossils.png" }

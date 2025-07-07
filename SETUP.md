@@ -76,13 +76,10 @@ team1 = { name = "Fossils", color = "#BA8C25" }
 team2 = { name = "Crystals", color = "#D35E88" }
 
 # User monitoring
-[[users]]
-username = "your_artfight_username"
-enabled = true
-
-[[users]]
-username = "another_username"
-enabled = true
+monitor_list = [
+    "your_artfight_username",
+    "another_username"
+]
 
 # Whitelist of supported ArtFight profiles (optional)
 # If empty, all profiles are allowed

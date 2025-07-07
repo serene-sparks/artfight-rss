@@ -39,9 +39,9 @@ print(f"    db_path: {settings.db_path}")
 print(f"    cache_db_path: {settings.cache_db_path}")
 
 print("\n  User Monitoring:")
-print(f"    users: {len(settings.users)} configured")
-for i, user in enumerate(settings.users, 1):
-    print(f"      {i}. {user.username} (enabled: {user.enabled})")
+print(f"    monitor_list: {len(settings.monitor_list)} configured")
+for i, username in enumerate(settings.monitor_list, 1):
+    print(f"      {i}. {username}")
 print(f"    whitelist: {len(settings.whitelist)} entries")
 
 print("\n🔍 Boolean Checks:")

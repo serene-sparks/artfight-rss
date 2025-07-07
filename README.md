@@ -169,6 +169,11 @@ whitelist = [
 ]
 ```
 
+#### User monitoring
+monitor_list = [
+    "example_user"
+]
+
 ## Usage
 
 ### Service Management (Systemd Installation)
@@ -313,9 +318,9 @@ The service now includes direct Discord bot functionality with rich embed messag
    discord_notify_leader_changes = true
    
    # User monitoring
-   [[users]]
-   username = "example_user"
-   enabled = true
+   monitor_list = [
+       "example_user"
+   ]
    ```
 
 #### Option 2: Discord Webhook
@@ -387,13 +392,10 @@ When using bot token mode, the following slash commands are available:
 To monitor specific users for new attacks and defenses:
 
 ```toml
-[[users]]
-username = "artist1"
-enabled = true
-
-[[users]]
-username = "artist2"
-enabled = true
+monitor_list = [
+    "artist1",
+    "artist2"
+]
 ```
 
 The bot will check these users at the configured `request_interval` and send Discord notifications for any new activity.
