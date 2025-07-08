@@ -286,15 +286,17 @@ async def fetch_and_emit_events_for_users(usernames: list[str]) -> None:
     await asyncio.gather(*tasks)
 
 
-async def graceful_shutdown(signal, frame):
+def graceful_shutdown(signal, frame):
     """Handle graceful shutdown."""
     logger.info(f"Received signal {signal}, shutting down...")
     
-    # Create a task to perform shutdown actions
-    shutdown_task = asyncio.create_task(shutdown_logic())
-    
-    # Wait for the task to complete
-    await shutdown_task
+    # Schedule the async shutdown logic to run in the event loop
+    if asyncio.get_event_loop().is_running():
+        asyncio.get_event_loop().create_task(shutdown_logic())
+    else:
+        # If no event loop is running, we can't schedule async tasks
+        logger.warning("No event loop running, cannot perform async shutdown")
+        sys.exit(0)
 
 
 async def shutdown_logic():
@@ -311,8 +313,8 @@ async def shutdown_logic():
 
     logger.info("Graceful shutdown complete.")
     
-    # It's generally a good practice to exit after cleanup
-    # sys.exit(0) is commented out as uvicorn handles the exit.
+    # Exit the process after cleanup
+    sys.exit(0)
 
 
 # Set up signal handlers for graceful shutdown

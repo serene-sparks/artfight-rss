@@ -6,7 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import settings
+from .logging_config import get_logger
 from .models import ArtFightAttack, ArtFightDefense, TeamStanding
+
+logger = get_logger(__name__)
 
 
 def ensure_timezone_aware(dt: datetime) -> datetime:
