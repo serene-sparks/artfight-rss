@@ -1,34 +1,33 @@
 # ArtFight RSS Service
 
-A Python RSS service that monitors ArtFight profiles and team standings
+A Python service that monitors ArtFight profiles and team standings and provides RSS feeds.
 
 ## Features
 
-- **Profile Monitoring**: Watch multiple ArtFight user profiles for new attacks and defenses
-- **Team Standings**: Monitor team standings with color-based parsing and leader change detection
-- **RSS Feed Generation**: Creates RSS feeds for existing Discord RSS bots
-- **Rate Limiting**: Configurable request intervals to avoid overwhelming ArtFight
-- **SQLite Caching**: Persistent SQLite-based caching to minimize redundant requests
-- **Whitelist Support**: Control which profiles can be monitored
-- **Historical Tracking**: Preserve team standings history and detect leader changes
-- **Optimized Pagination**: Early termination when no new content is found
+- **Profile Monitoring**: Watch multiple ArtFight user profiles for new attacks and defenses.
+- **Team Standings**: Monitor team standings with color-based parsing and leader change detection.
+- **RSS Feed Generation**: Creates RSS feeds compatible with popular RSS bots.
+- **Direct Discord Integration**: Provides real-time, rich embed notifications for new activity, removing the need for an external RSS bot.
+- **Respectful Scraping**: Configurable rate-limiting, request delays, and smart pagination to be kind to ArtFight servers.
+- **Persistent Storage**: Uses a SQLite database to cache data and track history, minimizing redundant requests.
+- **Access Control**: A user whitelist can be configured to control which profiles can be monitored.
 
 ## Installation
 
 ### Quick "production" Setup (Recommended)
 
+This setup uses `systemd` to run the service in the background on a Linux server.
+
 #### 1. Create a Dedicated User
+It's good practice to run services under a dedicated, non-privileged user account.
 ```bash
 # Create a system user for the service
 sudo useradd -r -s /bin/false artfight-rss
-
-# Create a group (optional, will use user name as group)
-sudo groupadd artfight-rss
 ```
 
 #### 2. Clone the Repository
 ```bash
-# Clone to a suitable location
+# Clone to a standard location like /opt
 sudo git clone <your-repo-url> /opt/artfight-rss
 cd /opt/artfight-rss
 
@@ -38,46 +37,45 @@ sudo chown -R artfight-rss:artfight-rss /opt/artfight-rss
 
 #### 3. Configure the Service
 ```bash
-# Copy the example configuration
+# As the service user, copy the example configuration
 sudo -u artfight-rss cp config.example.toml config.toml
 
-# Edit the configuration (as the service user)
+# Edit the configuration file
 sudo -u artfight-rss nano config.toml
 ```
 
 **Important Configuration Steps:**
-- Set your ArtFight authentication cookies (`laravel_session`, `cf_clearance`, `remember_web`)
-- Configure team colors to match ArtFight's progress bars
-- Add usernames to the whitelist (highly recommended)
-- Adjust request intervals if needed
+- Set your ArtFight authentication cookies (`laravel_session`, `cf_clearance`). See the "Authentication" section below.
+- To use the Discord bot, set `discord_enabled = true` and provide a bot token or webhook URL.
+- It is highly recommended to add usernames to the `whitelist` if your service will be publicly accessible.
 
-#### 4. Install as Systemd Service
+#### 4. Install as a Systemd Service
 ```bash
-# Run the systemd setup script
+# Run the included setup script
 sudo python scripts/setup_systemd.py
 ```
 
-The script will:
-- Create a Python virtual environment
-- Install all dependencies
-- Create and enable the systemd service
-- Start the service automatically
+The script will automatically:
+- Create a Python virtual environment for the project.
+- Install all necessary dependencies.
+- Create and enable a `systemd` service file.
+- Start the service.
 
 #### 5. Verify Installation
 ```bash
-# Check service status
+# Check the service status
 sudo systemctl status artfight-rss
 
-# View logs
+# View live logs
 sudo journalctl -u artfight-rss -f
 
-# Test the service
+# Test the health check endpoint
 curl http://localhost:8000/health
 ```
 
 ### Manual Installation (Development)
 
-If you prefer to run manually or for development:
+This method is for running the service manually, for example, during development.
 
 #### 1. Clone and Setup
 ```bash
@@ -92,179 +90,142 @@ uv sync
 ```bash
 cp config.example.toml config.toml
 # Edit config.toml with your settings
+nano config.toml
 ```
 
 #### 3. Run
 ```bash
-# Development
+# Run in development mode with debug logging enabled
 DEBUG=1 uv run python -m artfight_rss.main
 
-# Production
+# Run in production mode
 uv run uvicorn artfight_rss.main:app --host 0.0.0.0 --port 8000
 ```
 
-## Warnings
+## Disclaimer
 
-- This service is not affiliated with ArtFight.net or any of its developers.
-- This service is not responsible for any data loss or other issues that may occur.
-- This service is not responsible for any legal issues that may arise from the use of this service.
-- This service is designed to be used for personal use only.
-- This service is designed by a professional moron and is not guaranteed to work.
-- This service is designed by a professional moron and is not guaranteed to be secure.
-- Use at your own risk.
-- Be kind to the ArtFight server. Please.
-- Did I mention that this service is designed by a professional moron?
+- This is an unofficial project and is not affiliated with ArtFight.net or its developers.
+- Please use this service responsibly. Be mindful of the ArtFight servers and do not set request intervals too low.
+- The user of this service is solely responsible for any consequences of its use.
+
+## AI Disclosure
+This project was created with significant assistance from AI tools (Cursor/Claude). This is a common practice in modern software development, and in the spirit of transparency, it's disclosed here. All AI-generated code was reviewed, revised, and tested by a human.
 
 ## Configuration
 
-### Authentication Setup
+### Authentication
 
-Since ArtFight requires authentication, you'll need to provide session cookies:
+ArtFight requires you to be logged in to view profiles. You must provide session cookies in `config.toml`.
 
-1. **Log into ArtFight.net** in your browser
-2. **Open Developer Tools** (F12) and go to the Network tab
-3. **Navigate to any page** on ArtFight (like your profile)
-4. **Find the request** and look at the Cookie header
-5. **Extract these cookies:**
-   - `laravel_session` - The main session cookie
-   - `cf_clearance` - Cloudflare clearance cookie
-   - `remember_web` - Remember web cookie (optional but recommended)
+1.  **Log into ArtFight.net** in your web browser.
+2.  **Open Developer Tools** (usually F12) and go to the "Network" tab.
+3.  **Refresh the page** and click on any request to `artfight.net`.
+4.  In the request details, find the **Request Headers** section and locate the `Cookie` header.
+5.  **Copy the values** for `laravel_session` and `cf_clearance`.
+6.  **Add them to your `config.toml` file:**
+    ```toml
+    laravel_session = "your_laravel_session_value_here"
+    cf_clearance = "your_cf_clearance_value_here"
+    ```
 
-6. **Add them to your `config.toml` file:**
-   ```toml
-   laravel_session = "your_laravel_session_value_here"
-   cf_clearance = "your_cf_clearance_value_here"
-   remember_web = "your_remember_web_value_here"
-   ```
+### General
 
-### Configuration Options
+-   `request_interval_sec`: Minimum seconds between requests for the same user (default: 300).
+-   `team_check_interval_sec`: How often to check team standings (default: 3600).
+-   `page_request_delay_sec`: Base delay between fetching pages of attacks/defenses (default: 3.0).
+-   `page_request_wobble`: Random "wobble" added to the page delay to make requests less uniform (default: 0.2, which means ±20%).
 
-The service uses a TOML configuration file with the following sections:
+### Teams
 
-#### General Settings
-- `request_interval_sec`: Minimum seconds between requests to ArtFight (default: 300)
-- `team_check_interval_sec`: How often to check team standings (default: 3600)
-- `page_request_delay_sec`: Delay between page requests during pagination (default: 3.0)
-- `page_request_wobble`: Random wobble factor for delays (default: 0.2)
-
-#### Team Configuration
-If you want to monitor team standings, you can configure the teams and their colors.
-
-If the colors are not set, the first bar will be used as team1. This is not recommended as the first bar may not be the correct team.
+You can monitor team standings by configuring the teams and their colors. If colors are not set, the service might not be able to correctly identify the teams.
 
 ```toml
 [teams]
-team1 = { name = "Fossils", color = "#BA8C25" }
-team2 = { name = "Crystals", color = "#D35E88" }
+team1 = { name = "Fossils", color = "#BA8C25", image_url = "https://images.artfight.net/2025/2025_Fossils.png" }
+team2 = { name = "Crystals", color = "#D35E88", image_url = "https://images.artfight.net/2025/2025_Crystals.png" }
 ```
 
-#### Whitelist
-If you want to limit the users that can be monitored, you can add them to the whitelist.
-This is highly, highly recommended. If you don't, you will probably be banned from ArtFight if some bot decides to scrape your instance.
+### Whitelist and Monitored Users
+
+-   `whitelist`: A list of ArtFight usernames that are allowed to be requested via the API. **Highly recommended to prevent abuse.**
+-   `monitor_list`: A list of users to monitor automatically for the Discord notifications.
 
 ```toml
 whitelist = [
     "example_user",
     "another_user"
 ]
-```
 
-#### User monitoring
 monitor_list = [
     "example_user"
 ]
+```
 
 ## Usage
 
-### Service Management (Systemd Installation)
+### Service Management (Systemd)
+If you used the `setup_systemd.py` script, you can manage the service with these commands:
 
-If you installed using the systemd setup script:
-
-```bash
-# View service status
-sudo systemctl status artfight-rss
-
-# View logs
-sudo journalctl -u artfight-rss -f
-
-# Stop service
-sudo systemctl stop artfight-rss
-
-# Start service
-sudo systemctl start artfight-rss
-
-# Restart service
-sudo systemctl restart artfight-rss
-
-# Disable service (won't start on boot)
-sudo systemctl disable artfight-rss
-
-# Enable service (will start on boot)
-sudo systemctl enable artfight-rss
-```
-
-### Manual Usage (Development)
-
-For development or manual installation:
-
-```bash
-# Development mode with debug logging
-DEBUG=1 uv run python -m artfight_rss.main
-
-# Production mode
-uv run uvicorn artfight_rss.main:app --host 0.0.0.0 --port 8000
-```
+-   **View status:** `sudo systemctl status artfight-rss`
+-   **View logs:** `sudo journalctl -u artfight-rss -f`
+-   **Start/Stop/Restart:** `sudo systemctl start|stop|restart artfight-rss`
+-   **Enable/Disable on boot:** `sudo systemctl enable|disable artfight-rss`
 
 ### Updating the Service
-
-To update dependencies or the application:
+To update the application and its dependencies for a systemd installation:
 
 ```bash
-# Update dependencies (systemd installation)
-sudo -u artfight-rss /opt/artfight-rss/venv/bin/pip install -e /opt/artfight-rss --upgrade
+# As the service user, update the code from git
+sudo -u artfight-rss git pull
 
-# Restart the service
+# As the service user, update dependencies
+sudo -u artfight-rss /opt/artfight-rss/venv/bin/uv sync --quiet
+
+# Restart the service to apply changes
 sudo systemctl restart artfight-rss
 ```
 
 ## API Endpoints
 
-- `GET /health`: Health check
-- `GET /auth/status`: Authentication status and information
-- `GET /rss/{username}/attacks`: RSS feed for a specific user's attacks
-- `GET /rss/{username}/defenses`: RSS feed for a specific user's defenses
-- `GET /rss/standings`: RSS feed for team standing changes (daily updates + leader changes)
-- `POST /webhook/teams`: Manual trigger for team check
-- `GET /cache/stats`: Cache statistics
-- `POST /cache/clear`: Clear cache
-- `POST /cache/cleanup`: Cleanup expired cache
+The service provides several RESTful endpoints for fetching data.
+
+#### Health and Status
+- `GET /health`
+  - A simple health check. Returns `{"status": "healthy"}` if the service is running.
+- `GET /auth/status`
+  - Checks if the provided authentication cookies are configured and still valid.
+
+#### RSS Feeds
+All RSS endpoints support an optional `limit` query parameter (e.g., `?limit=25`) to control the number of items returned. The default and maximum limit is configured in `config.toml`.
+
+- `GET /rss/attacks/{usernames}`
+  - Generates an RSS feed for attacks against one or more users.
+  - For multiple users, separate usernames with a `+` (e.g., `user1+user2`).
+- `GET /rss/defenses/{usernames}`
+  - Generates an RSS feed for defenses made by one or more users.
+- `GET /rss/combined/{usernames}`
+  - Generates a single feed containing both attacks and defenses for the specified users.
+- `GET /rss/standings`
+  - Generates an RSS feed for team standing changes. It includes daily updates and special entries for leader changes.
+
+#### Webhooks & Cache
+- `POST /webhook/teams`
+  - Manually triggers a check for team standings.
+- `GET /cache/stats`
+  - Returns statistics about the internal cache.
+- `POST /cache/clear`
+  - Clears the entire cache.
+- `POST /cache/cleanup`
+  - Clears only expired entries from the cache.
 
 ## RSS Integration
 
-The service generates RSS feeds that can be consumed by an RSS reader. The project is designed with Discord in mind, but it can be used with any RSS reader.
+The generated RSS feeds can be used with any standard RSS reader or bot, such as MonitoRSS for Discord.
 
-- **User Attack Feeds**: `/rss/{username}/attacks` - Contains recent attacks on the user
-- **User Defense Feeds**: `/rss/{username}/defenses` - Contains recent defenses by the user
-- **Team Changes Feed**: `/rss/standings` - Contains team standing changes (daily updates and leader changes)
-
-### Example RSS Bot Configuration
-
-For Discord RSS bots like [RSS Bot](https://github.com/DarkView/RSSCord) or similar:
-
-1. **User Attack Feed:**
-   ```
-   URL: http://your-server:8000/rss/username
-   ```
-
-2. **User Defense Feed:**
-   ```
-   URL: http://your-server:8000/rss/username/defenses
-   ```
-
-4. **Team Changes Feed:**
-   ```
-   URL: http://your-server:8000/rss/standings
-   ```
+**Example URLs:**
+- **Attacks on `example_user`:** `http://your-server-ip:8000/rss/attacks/example_user`
+- **Defenses by `user1` and `user2`:** `http://your-server-ip:8000/rss/defenses/user1+user2`
+- **Team Standings:** `http://your-server-ip:8000/rss/standings`
 
 ## Discord Bot Integration
 
@@ -443,12 +404,12 @@ Automatically detects when the leading team changes and flags these events in th
 - Provides daily snapshots and leader change events
 - Tracks statistics over time
 
-### User Attack and Defense Feeds
-
-### Kind as Possible to the ArtFight Server
-- Early termination for scraping
-- Configurable request delays with random wobble to avoid cloudflare detection. As much as this service is very kind to the ArtFight server, it's probably still not something they want. Please be kind to the server. Please.
-- Efficient pagination with smart caching
+### Respectful Scraping
+The service is designed to be as kind as possible to ArtFight's servers:
+- **Early termination**: Stops fetching pages when no new content is found
+- **Configurable delays**: Random delays between requests to avoid detection
+- **Smart caching**: Minimizes redundant requests through persistent storage
+- **Rate limiting**: Built-in rate limiting to prevent overwhelming the server
 
 ## Logging and Monitoring
 
@@ -476,21 +437,6 @@ Logging is automatically configured based on the `debug` setting in your config:
 - `debug = true`: DEBUG level for application modules, INFO for HTTP clients
 - `debug = false`: INFO level for application modules, WARNING for HTTP clients
 
-#### Testing Logging
-```bash
-# Test the logging configuration
-python scripts/test_logging.py
-```
-
-#### Testing Shutdown Handling
-```bash
-# Test shutdown handling
-python scripts/test_shutdown.py
-
-# Test server startup and shutdown
-python scripts/test_server_shutdown.py
-```
-
 ### Graceful Shutdown
 
 The service supports graceful shutdown with proper signal handling:
@@ -500,32 +446,6 @@ The service supports graceful shutdown with proper signal handling:
 - **Timeout Protection**: 5-second timeout for component shutdown
 - **Background Task Cleanup**: Proper cancellation of monitoring loops
 - **Discord Bot**: Proper startup and shutdown with timeout protection
-- **FastAPI Lifespan**: Uses FastAPI's lifespan context manager for proper startup/shutdown
-
-#### Shutdown Behavior
-- **Immediate Response**: The server responds to Ctrl+C within 1-2 seconds
-- **Clean Cancellation**: Background tasks are cancelled gracefully
-- **Discord Bot**: Bot startup and shutdown are handled with proper timeout protection
-- **Monitor Loops**: Team monitoring loops are cancelled and cleaned up
-
-#### Testing Shutdown
-```bash
-# Test automatic shutdown after 10 seconds
-uv run python scripts/test_shutdown.py
-
-# Test server shutdown handling
-uv run python scripts/test_server_shutdown.py
-
-# Test manual server startup and shutdown
-uv run python scripts/test_manual_shutdown.py
-```
-
-#### Manual Testing
-To test shutdown manually:
-1. Start the server: `uv run python -m artfight_rss.main`
-2. Wait for startup to complete (Discord bot login, etc.)
-3. Press Ctrl+C in the terminal
-4. The server should shut down gracefully within 3-5 seconds
 
 ### Health Checks
 ```bash
@@ -640,7 +560,7 @@ sudo chmod 755 /opt/artfight-rss/cache
 #### RSS Feed Issues
 - Verify usernames are in the whitelist
 - Check service is running: `curl http://localhost:8000/health`
-- Test RSS feed directly: `curl http://localhost:8000/rss/username/attacks`
+- Test RSS feed directly: `curl http://localhost:8000/rss/attacks/username`
 
 #### Team Standings Issues
 - Verify team colors match ArtFight's progress bars exactly
@@ -655,10 +575,14 @@ sudo chmod 755 /opt/artfight-rss/cache
 4. **Check ArtFight**: Verify the website structure hasn't changed
 
 ## AI Disclosures
-This project was made with heavy assistance from AI. This can be very controvertial in art spaces and I want to clarify why I decided to go this route.
+This project was made with heavy assistance from AI. This can be very
+controvertial in art spaces and I want to clarify why I decided to go this
+route.
 
-AI in software engineering is practically mandatory for modern employment. I don't like this. I would love to write code by hand, but I also need to be hirable and experienced
-with the tools of the trade. Any and all AI use is done with heavy supervision and a lot of handholding.
+AI in software engineering is practically mandatory for modern employment. I
+don't like this. I would love to write code by hand, but I also need to be
+hirable and experienced with the tools of the trade. Any and all AI use is done
+with heavy supervision and a lot of handholding.
 
 - Estimated percentage of code initially written by AI prompting: 80%.
 - Estimated percentage of code revised by a human: 60%

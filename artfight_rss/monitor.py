@@ -197,7 +197,7 @@ class ArtFightMonitor:
             # Get previously seen attack IDs from database BEFORE fetching new ones
             previous_attack_ids = self.database.get_existing_attack_ids(username)
             
-            attacks = await self.artfight_client.get_user_attacks(username)
+            attacks = await self.artfight_client._fetch_user_content(username, "attacks")
             if not attacks:
                 return
 
@@ -224,7 +224,7 @@ class ArtFightMonitor:
             # Get previously seen defense IDs from database BEFORE fetching new ones
             previous_defense_ids = self.database.get_existing_defense_ids(username)
             
-            defenses = await self.artfight_client.get_user_defenses(username)
+            defenses = await self.artfight_client._fetch_user_content(username, "defenses")
             if not defenses:
                 return
 

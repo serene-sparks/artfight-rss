@@ -1,0 +1,55 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# AI Disclosure Preservation Rule
+
+## Overview
+AI agents are strictly prohibited from removing AI disclosure sections from documentation such as README files. These sections are essential for transparency and ethical AI use.
+
+## Rules
+
+### Preservation Requirements
+- **NEVER remove** AI disclosure sections from documentation
+- **NEVER delete** content within AI disclosure sections
+- **NEVER consolidate** AI disclosure sections with other content in a way that removes disclosure information
+
+### Permitted Actions
+- **Add** additional information to AI disclosure sections for clarity
+- **Reword** existing content for better readability and professionalism
+- **Expand** disclosure sections with more details about AI usage
+- **Reorganize** disclosure sections within the same document (but never remove them)
+
+### Documentation Types
+This rule applies to all documentation files including:
+- README files (README.md, README.txt, etc.)
+- Documentation files (.md, .txt, .rst, etc.)
+- Code comments that mention AI assistance
+- Any other files containing AI disclosure information
+
+### Examples of Forbidden Actions
+- ❌ Removing an "AI Disclosure" section entirely
+- ❌ Deleting specific lines about AI usage percentages
+- ❌ Consolidating AI disclosure into a generic "About" section that removes transparency
+- ❌ Moving AI disclosure to a separate file without maintaining it in the main documentation
+
+### Examples of Permitted Actions
+- ✅ Rewording "This project was made with heavy assistance from AI" to "This project was created with significant assistance from AI tools"
+- ✅ Adding more details about specific AI tools used
+- ✅ Expanding on the reasoning behind AI usage
+- ✅ Improving formatting and structure of existing disclosure content
+
+## Enforcement
+When editing documentation files, always:
+1. Check for existing AI disclosure sections
+2. Preserve all content within those sections
+3. Only enhance or clarify the existing disclosure information
+4. If no AI disclosure exists, consider adding one for transparency
+
+## Context
+This rule ensures that projects maintain transparency about AI assistance, which is important for:
+- Ethical AI development practices
+- Academic and professional integrity
+- Building trust with users and contributors
+- Compliance with disclosure requirements in various contexts

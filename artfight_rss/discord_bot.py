@@ -28,43 +28,20 @@ class ArtFightDiscordBot:
         self.bot_task: asyncio.Task | None = None
 
     async def start(self):
-        """Start the Discord bot."""
+        """Start the Discord bot or webhook."""
         if not settings.discord_enabled:
-            logger.info("Discord bot disabled in configuration")
+            logger.info("Discord bot disabled in configuration.")
             return
 
-        if not settings.discord_token and not settings.discord_webhook_url:
-            logger.warning("Discord bot enabled but no token or webhook URL provided")
+        if settings.discord_token:
+            await self._start_bot()
+        elif settings.discord_webhook_url:
+            await self._start_webhook()
+        else:
+            logger.warning("Discord integration enabled but no token or webhook URL provided.")
             return
 
-        try:
-            if settings.discord_token:
-                # Start bot in background task to avoid blocking
-                import asyncio
-                self.bot_task = asyncio.create_task(self._start_bot())
-                
-                # Wait for the bot to be ready with timeout
-                startup_timeout = float(settings.discord_startup_timeout)
-                logger.info(f"Waiting for Discord bot to be ready (timeout: {startup_timeout}s)...")
-                await asyncio.wait_for(self.ready_event.wait(), timeout=startup_timeout)
-                logger.info("Discord bot is ready and operational")
-                
-            elif settings.discord_webhook_url:
-                await self._start_webhook()
-
-            self.running = True
-            logger.info("Discord bot started successfully")
-        except asyncio.TimeoutError:
-            logger.error(f"Discord bot failed to become ready within {settings.discord_startup_timeout}s")
-            logger.error("This may be due to:")
-            logger.error("- Invalid bot token")
-            logger.error("- Bot not added to server")
-            logger.error("- Incorrect permissions")
-            logger.error("- Network connectivity issues")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to start Discord bot: {e}")
-            raise
+        self.running = True
 
     async def stop(self):
         """Stop the Discord bot."""
@@ -96,40 +73,25 @@ class ArtFightDiscordBot:
     async def _start_bot(self):
         """Start the Discord bot with slash commands."""
         intents = discord.Intents.default()
-        # Only enable message content if we need it for commands
-        # intents.message_content = True  # Commented out to avoid privileged intents
-
         self.bot = commands.Bot(command_prefix="!", intents=intents)
 
         @self.bot.event
         async def on_ready():
-            if not self.bot:
+            if not self.bot or not self.bot.user:
                 return
                 
             logger.info(f"Discord bot logged in as {self.bot.user}")
 
             # Set up channel for notifications
             if settings.discord_channel_id:
-                # Try to find the channel by searching through all guilds
-                target_channel = None
-                for guild in self.bot.guilds:
-                    for channel in guild.text_channels:
-                        if channel.id == settings.discord_channel_id:
-                            target_channel = channel
-                            break
-                    if target_channel:
-                        break
-
-                if target_channel:
-                    self.channel = target_channel
+                channel = self.bot.get_channel(settings.discord_channel_id)
+                if isinstance(channel, discord.TextChannel):
+                    self.channel = channel
                     logger.info(f"Connected to notification channel: {self.channel.name}")
+                elif channel:
+                    logger.warning(f"Channel with ID {settings.discord_channel_id} is not a text channel.")
                 else:
                     logger.warning(f"Could not find channel with ID: {settings.discord_channel_id}")
-                    logger.warning("Available channels:")
-                    for guild in self.bot.guilds:
-                        logger.warning(f"  Guild: {guild.name}")
-                        for channel in guild.text_channels:
-                            logger.warning(f"    - {channel.name} (ID: {channel.id})")
 
             # Register slash commands after bot is ready
             try:
@@ -140,19 +102,20 @@ class ArtFightDiscordBot:
             # Signal that the bot is ready
             self.ready_event.set()
 
-        # Start the bot
-        if not settings.discord_token:
-            raise ValueError("Discord token is required for bot mode")
-        
-        # Start the bot (no timeout here, handled at higher level)
         try:
-            logger.info("Starting Discord bot...")
-            await self.bot.start(settings.discord_token)
-        except asyncio.CancelledError:
-            logger.info("Discord bot startup cancelled")
+            assert settings.discord_token is not None
+            self.bot_task = asyncio.create_task(self.bot.start(settings.discord_token))
+            await asyncio.wait_for(self.ready_event.wait(), timeout=float(settings.discord_startup_timeout))
+            logger.info("Discord bot is ready and operational.")
+        except asyncio.TimeoutError:
+            logger.error(f"Discord bot failed to become ready within {settings.discord_startup_timeout}s timeout.")
+            if self.bot_task:
+                self.bot_task.cancel()
             raise
         except Exception as e:
-            logger.error(f"Discord bot startup failed: {e}")
+            logger.error(f"Failed to start Discord bot: {e}")
+            if self.bot_task:
+                self.bot_task.cancel()
             raise
 
     async def _start_webhook(self):
@@ -218,7 +181,7 @@ class ArtFightDiscordBot:
 
     async def _handle_stats_command(self, interaction: discord.Interaction):
         """Handle the stats command."""
-        # This would need to be implemented to get actual stats from the monitor
+
         embed = discord.Embed(
             title="ArtFight Bot Statistics",
             description="Current bot status and statistics",
@@ -262,7 +225,7 @@ class ArtFightDiscordBot:
 
     async def _handle_teams_command(self, interaction: discord.Interaction):
         """Handle the teams command."""
-        # This would need to be implemented to get actual team standings
+
         embed = discord.Embed(
             title="ArtFight Team Standings",
             description="Current team standings and leader information",

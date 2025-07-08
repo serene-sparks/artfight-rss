@@ -5,7 +5,7 @@ import signal
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.responses import PlainTextResponse
 
 from .artfight import ArtFightClient
@@ -37,27 +37,22 @@ async def lifespan(app: FastAPI):
     logger.info("Starting ArtFight RSS service...")
 
     # Initialize components
-    logger.info("Initializing components...")
     cache = SQLiteCache(settings.cache_db_path)
     database = ArtFightDatabase(settings.db_path)
     rate_limiter = RateLimiter(database, settings.request_interval)
     monitor = ArtFightMonitor(cache, rate_limiter, database)
-    logger.info("Components initialized successfully")
 
     # Start monitoring
-    logger.info("Starting monitoring service...")
     await monitor.start()
-    logger.info("Monitoring service started")
 
     # Set up event handlers
-    logger.info("Setting up event handlers...")
     setup_event_handlers(monitor)
-    logger.info("Event handlers set up")
 
     # Start Discord bot
-    logger.info("Starting Discord bot...")
-    await discord_bot.start()
-    logger.info("Discord bot started")
+    if settings.discord_enabled:
+        logger.info("Starting Discord bot...")
+        await discord_bot.start()
+        logger.info("Discord bot started")
 
     logger.info("ArtFight RSS service started successfully")
     
@@ -65,7 +60,8 @@ async def lifespan(app: FastAPI):
     
     # Cleanup
     logger.info("Shutting down ArtFight RSS service...")
-    await discord_bot.stop()
+    if settings.discord_enabled:
+        await discord_bot.stop()
     await monitor.stop()
     logger.info("ArtFight RSS service shutdown complete")
 
@@ -77,6 +73,33 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan
 )
+
+
+def validate_users(usernames: str) -> list[str]:
+    """Dependency to parse and validate a list of usernames."""
+    username_list = [u.strip() for u in usernames.split('+') if u.strip()]
+
+    if not username_list:
+        raise HTTPException(
+            status_code=400,
+            detail="No usernames specified. Please provide at least one username."
+        )
+
+    if len(username_list) > settings.max_users_per_feed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many users. Maximum allowed: {settings.max_users_per_feed}"
+        )
+
+    if settings.whitelist:
+        invalid_users = [u for u in username_list if u not in settings.whitelist]
+        if invalid_users:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Users not allowed: {', '.join(invalid_users)}"
+            )
+    
+    return username_list
 
 
 @app.get("/health")
@@ -112,34 +135,11 @@ async def get_team_standings_changes_rss(limit: int = Query(None, description="M
 
 
 @app.get("/rss/attacks/{usernames}")
-async def get_multiuser_attacks_rss(usernames: str, limit: int = Query(None, description="Maximum number of items to return")):
+async def get_multiuser_attacks_rss(
+    username_list: list[str] = Depends(validate_users),
+    limit: int = Query(None, description="Maximum number of items to return")
+):
     """Get RSS feed for multiple users' attacks."""
-    # Parse usernames from URL (format: user1+user2+user3)
-    username_list = usernames.split('+')
-
-    # Check if any users are provided
-    if not username_list or not any(username_list):
-        raise HTTPException(
-            status_code=400,
-            detail="No users specified. Please provide at least one username."
-        )
-
-    # Check user limit
-    if len(username_list) > settings.max_users_per_feed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Too many users. Maximum allowed: {settings.max_users_per_feed}"
-        )
-
-    # Check if all users are in whitelist
-    if settings.whitelist:
-        invalid_users = [u for u in username_list if u not in settings.whitelist]
-        if invalid_users:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Users not found: {', '.join(invalid_users)}"
-            )
-
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
@@ -157,34 +157,11 @@ async def get_multiuser_attacks_rss(usernames: str, limit: int = Query(None, des
 
 
 @app.get("/rss/defenses/{usernames}")
-async def get_multiuser_defenses_rss(usernames: str, limit: int = Query(None, description="Maximum number of items to return")):
+async def get_multiuser_defenses_rss(
+    username_list: list[str] = Depends(validate_users),
+    limit: int = Query(None, description="Maximum number of items to return")
+):
     """Get RSS feed for multiple users' defenses."""
-    # Parse usernames from URL (format: user1+user2+user3)
-    username_list = usernames.split('+')
-
-    # Check if any users are provided
-    if not username_list or not any(username_list):
-        raise HTTPException(
-            status_code=400,
-            detail="No users specified. Please provide at least one username."
-        )
-
-    # Check user limit
-    if len(username_list) > settings.max_users_per_feed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Too many users. Maximum allowed: {settings.max_users_per_feed}"
-        )
-
-    # Check if all users are in whitelist
-    if settings.whitelist:
-        invalid_users = [u for u in username_list if u not in settings.whitelist]
-        if invalid_users:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Users not found: {', '.join(invalid_users)}"
-            )
-
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
@@ -202,34 +179,11 @@ async def get_multiuser_defenses_rss(usernames: str, limit: int = Query(None, de
 
 
 @app.get("/rss/combined/{usernames}")
-async def get_multiuser_combined_rss(usernames: str, limit: int = Query(None, description="Maximum number of items to return")):
+async def get_multiuser_combined_rss(
+    username_list: list[str] = Depends(validate_users),
+    limit: int = Query(None, description="Maximum number of items to return")
+):
     """Get combined RSS feed for multiple users' attacks and defenses."""
-    # Parse usernames from URL (format: user1+user2+user3)
-    username_list = usernames.split('+')
-
-    # Check if any users are provided
-    if not username_list or not any(username_list):
-        raise HTTPException(
-            status_code=400,
-            detail="No users specified. Please provide at least one username."
-        )
-
-    # Check user limit
-    if len(username_list) > settings.max_users_per_feed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Too many users. Maximum allowed: {settings.max_users_per_feed}"
-        )
-
-    # Check if all users are in whitelist
-    if settings.whitelist:
-        invalid_users = [u for u in username_list if u not in settings.whitelist]
-        if invalid_users:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Users not found: {', '.join(invalid_users)}"
-            )
-
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
@@ -294,58 +248,76 @@ async def cleanup_cache():
 @app.get("/auth/status")
 async def get_auth_status():
     """Get authentication status and information."""
-    artfight_client = ArtFightClient(rate_limiter, database)
+    client = ArtFightClient(rate_limiter, database)
     try:
-        auth_info = artfight_client.get_authentication_info()
-        is_valid = await artfight_client.validate_authentication() if auth_info["authenticated"] else False
+        auth_info = client.get_authentication_info()
+        is_valid = await client.validate_authentication()
 
         return {
             "configured": auth_info["authenticated"],
             "valid": is_valid,
-            "details": auth_info
+            "details": auth_info,
         }
     finally:
-        await artfight_client.close()
+        await client.close()
 
 
 async def fetch_and_emit_events_for_user(username: str) -> None:
-    """Fetch fresh data for a user and emit events for new items."""
-    try:
-        # Fetch fresh attacks and emit events for new ones
-        previous_attack_ids = database.get_existing_attack_ids(username)
-        attacks = await monitor.artfight_client.get_user_attacks(username)
-        if attacks:
-            current_attack_ids = {attack.id for attack in attacks}
-            new_attack_ids = current_attack_ids - previous_attack_ids
-            if new_attack_ids:
-                logger.info(f"RSS access found {len(new_attack_ids)} new attacks for {username}")
-                for attack in attacks:
-                    if attack.id in new_attack_ids:
-                        await monitor.emit_event('new_attack', attack)
+    """
+    Fetches attacks and defenses for a user and emits events.
 
-        # Fetch fresh defenses and emit events for new ones
-        previous_defense_ids = database.get_existing_defense_ids(username)
-        defenses = await monitor.artfight_client.get_user_defenses(username)
-        if defenses:
-            current_defense_ids = {defense.id for defense in defenses}
-            new_defense_ids = current_defense_ids - previous_defense_ids
-            if new_defense_ids:
-                logger.info(f"RSS access found {len(new_defense_ids)} new defenses for {username}")
-                for defense in defenses:
-                    if defense.id in new_defense_ids:
-                        await monitor.emit_event('new_defense', defense)
-
-    except Exception as e:
-        logger.error(f"Error fetching and emitting events for {username}: {e}")
+    Args:
+        username: The ArtFight username.
+    """
+    logger.debug(f"Fetching data for user: {username}")
+    await monitor._fetch_user_attacks(username)
+    await monitor._fetch_user_defenses(username)
+    logger.debug(f"Finished fetching data for user: {username}")
 
 
 async def fetch_and_emit_events_for_users(usernames: list[str]) -> None:
-    """Fetch fresh data for multiple users and emit events for new items."""
-    for username in usernames:
-        await fetch_and_emit_events_for_user(username)
+    """
+    Fetches attacks and defenses for a list of users and emits events.
+
+    Args:
+        usernames: A list of ArtFight usernames.
+    """
+    tasks = [fetch_and_emit_events_for_user(u) for u in usernames]
+    await asyncio.gather(*tasks)
 
 
+async def graceful_shutdown(signal, frame):
+    """Handle graceful shutdown."""
+    logger.info(f"Received signal {signal}, shutting down...")
+    
+    # Create a task to perform shutdown actions
+    shutdown_task = asyncio.create_task(shutdown_logic())
+    
+    # Wait for the task to complete
+    await shutdown_task
 
+
+async def shutdown_logic():
+    """Contains the actual shutdown logic."""
+    logger.info("Starting graceful shutdown...")
+    
+    # Stop monitoring and other background tasks
+    if 'monitor' in globals() and monitor:
+        await monitor.stop()
+        
+    # Stop the Discord bot
+    if 'discord_bot' in globals() and discord_bot:
+        await discord_bot.stop()
+
+    logger.info("Graceful shutdown complete.")
+    
+    # It's generally a good practice to exit after cleanup
+    # sys.exit(0) is commented out as uvicorn handles the exit.
+
+
+# Set up signal handlers for graceful shutdown
+signal.signal(signal.SIGINT, graceful_shutdown)
+signal.signal(signal.SIGTERM, graceful_shutdown)
 
 
 if __name__ == "__main__":

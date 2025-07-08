@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from .config import settings
 from .models import ArtFightAttack, ArtFightDefense, TeamStanding
 
 
@@ -17,8 +18,6 @@ def ensure_timezone_aware(dt: datetime) -> datetime:
 
 def validate_and_apply_limit(requested_limit: int | None) -> int | None:
     """Validate and apply limit based on configuration."""
-    from .config import settings
-
     if requested_limit is None:
         return settings.max_feed_items
 
@@ -50,6 +49,7 @@ class ArtFightDatabase:
                     description TEXT,
                     image_url TEXT,
                     attacker_user TEXT NOT NULL,
+                    defender_user TEXT NOT NULL,
                     fetched_at TEXT NOT NULL,
                     url TEXT NOT NULL,
                     first_seen TEXT NOT NULL,
@@ -113,7 +113,7 @@ class ArtFightDatabase:
             for attack in attacks:
                 conn.execute("""
                     INSERT OR REPLACE INTO attacks
-                    (id, title, description, image_url, attacker_user, attacker_user,
+                    (id, title, description, image_url, attacker_user, defender_user,
                      fetched_at, url, first_seen, last_updated)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
@@ -122,7 +122,7 @@ class ArtFightDatabase:
                     attack.description,
                     str(attack.image_url) if attack.image_url else None,
                     attack.attacker_user,
-                    attack.attacker_user,
+                    attack.defender_user,
                     attack.fetched_at.isoformat(),
                     str(attack.url),
                     now,  # first_seen
@@ -139,55 +139,24 @@ class ArtFightDatabase:
 
         with sqlite3.connect(self.db_path) as conn:
             for defense in defenses:
-                # Check if this defense already exists
-                cursor = conn.execute(
-                    "SELECT first_seen FROM defenses WHERE id = ?",
-                    (defense.id,)
-                )
-                existing = cursor.fetchone()
-
-                if existing:
-                    # Update existing record
-                    conn.execute("""
-                        UPDATE defenses SET
-                        title = ?, description = ?, image_url = ?, defender_user = ?,
-                        attacker_user = ?, fetched_at = ?, url = ?, last_updated = ?
-                        WHERE id = ?
-                    """, (
-                        defense.title,
-                        defense.description,
-                        str(defense.image_url) if defense.image_url else None,
-                        defense.defender_user,
-                        defense.attacker_user,
-                        defense.fetched_at.isoformat(),
-                        str(defense.url),
-                        now,
-                        defense.id
-                    ))
-                else:
-                    # Insert new record
-                    conn.execute("""
-                        INSERT INTO defenses
-                        (id, title, description, image_url, defender_user, attacker_user,
-                         fetched_at, url, first_seen, last_updated)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        defense.id,
-                        defense.title,
-                        defense.description,
-                        str(defense.image_url) if defense.image_url else None,
-                        defense.defender_user,
-                        defense.attacker_user,
-                        defense.fetched_at.isoformat(),
-                        str(defense.url),
-                        now,  # first_seen
-                        now   # last_updated
-                    ))
+                conn.execute("""
+                    INSERT OR REPLACE INTO defenses
+                    (id, title, description, image_url, defender_user, attacker_user,
+                        fetched_at, url, first_seen, last_updated)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    defense.id,
+                    defense.title,
+                    defense.description,
+                    str(defense.image_url) if defense.image_url else None,
+                    defense.defender_user,
+                    defense.attacker_user,
+                    defense.fetched_at.isoformat(),
+                    str(defense.url),
+                    now,  # first_seen
+                    now   # last_updated
+                ))
             conn.commit()
-
-    def get_attacks_for_user(self, username: str, limit: int | None = None) -> list[ArtFightAttack]:
-        """Get attacks for a user, ordered by creation date (newest first)."""
-        return self.get_attacks_for_users([username], limit)
 
     def get_attacks_for_users(self, usernames: list[str], limit: int | None = None) -> list[ArtFightAttack]:
         """Get attacks for multiple users, ordered by creation date (newest first)."""
@@ -201,7 +170,7 @@ class ArtFightDatabase:
             # Create placeholders for the IN clause
             placeholders = ','.join(['?' for _ in usernames])
             query = f"""
-                SELECT id, title, description, image_url, attacker_user, attacker_user,
+                SELECT id, title, description, image_url, attacker_user, defender_user,
                        fetched_at, url
                 FROM attacks
                 WHERE attacker_user IN ({placeholders})
@@ -216,7 +185,7 @@ class ArtFightDatabase:
 
             attacks = []
             for row in rows:
-                (id_, title, description, image_url, attacker_user, attacker_user,
+                (id_, title, description, image_url, attacker_user, defender_user,
                  fetched_at, url) = row
 
                 # Parse datetime and ensure timezone awareness
@@ -233,17 +202,13 @@ class ArtFightDatabase:
                     description=description,
                     image_url=image_url_http,
                     attacker_user=attacker_user,
-                    defender_user="TDB",
+                    defender_user=defender_user,
                     fetched_at=fetched_dt,
                     url=url_http
                 )
                 attacks.append(attack)
 
             return attacks
-
-    def get_defenses_for_user(self, username: str, limit: int | None = None) -> list[ArtFightDefense]:
-        """Get defenses for a user, ordered by creation date (newest first)."""
-        return self.get_defenses_for_users([username], limit)
 
     def get_defenses_for_users(self, usernames: list[str], limit: int | None = None) -> list[ArtFightDefense]:
         """Get defenses for multiple users, ordered by creation date (newest first)."""
@@ -298,7 +263,7 @@ class ArtFightDatabase:
             return defenses
 
     def get_existing_defense_ids(self, username: str) -> set[str]:
-        """Get set of existing defense IDs for a user."""
+        """Get all existing defense IDs for a user from the database."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 "SELECT id FROM defenses WHERE defender_user = ?",
@@ -436,7 +401,6 @@ class ArtFightDatabase:
                 team1_name = "Team 1"
                 team2_name = "Team 2"
                 # Get team names from config if available
-                from .config import settings
                 if settings.teams:
                     team1_name = settings.teams.team1.name
                     team2_name = settings.teams.team2.name

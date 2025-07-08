@@ -5,6 +5,7 @@ import html
 import re
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urljoin
+from collections.abc import Sequence
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -18,6 +19,9 @@ from .models import ArtFightAttack, ArtFightDefense, TeamStanding
 
 # Set up logging
 logger = get_logger(__name__)
+
+# Constants
+REMEMBER_WEB_COOKIE_SUFFIX = "59ba36addc2b2f9401580f014c7f58ea4e30989d"
 
 
 class ArtFightClient:
@@ -61,21 +65,10 @@ class ArtFightClient:
         self.cookies = {}
         if settings.laravel_session:
             self.cookies["laravel_session"] = settings.laravel_session
-            logger.debug(f"Laravel session cookie configured (length: {len(settings.laravel_session)})")
-        else:
-            logger.debug("No Laravel session cookie configured")
-
         if settings.cf_clearance:
             self.cookies["cf_clearance"] = settings.cf_clearance
-            logger.debug(f"CF clearance cookie configured (length: {len(settings.cf_clearance)})")
-        else:
-            logger.debug("No CF clearance cookie configured")
-
         if settings.remember_web:
-            self.cookies["remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d"] = settings.remember_web
-            logger.debug(f"Remember web cookie configured (length: {len(settings.remember_web)})")
-        else:
-            logger.debug("No remember web cookie configured")
+            self.cookies[f"remember_web_{REMEMBER_WEB_COOKIE_SUFFIX}"] = settings.remember_web
 
         logger.debug(f"Cookies configured: {list(self.cookies.keys())}")
 
@@ -93,12 +86,10 @@ class ArtFightClient:
         if 'cookies' in kwargs and kwargs['cookies']:
             cookie_info = {}
             for key, value in kwargs['cookies'].items():
-                if key in ['laravel_session', 'cf_clearance', 'remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d']:
+                if key in ['laravel_session', 'cf_clearance', f"remember_web_{REMEMBER_WEB_COOKIE_SUFFIX}"]:
                     # Show first and last few characters for security
                     if len(value) > 8:
                         cookie_info[key] = f"{value[:4]}...{value[-4:]}"
-                    else:
-                        cookie_info[key] = f"{value[:2]}...{value[-2:]}"
                 else:
                     cookie_info[key] = value
             logger.debug(f"Request cookies: {cookie_info}")
@@ -113,12 +104,10 @@ class ArtFightClient:
         if response.cookies:
             cookie_info = {}
             for key, value in response.cookies.items():
-                if key in ['laravel_session', 'cf_clearance', 'remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d']:
+                if key in ['laravel_session', 'cf_clearance', f"remember_web_{REMEMBER_WEB_COOKIE_SUFFIX}"]:
                     # Show first and last few characters for security
                     if len(value) > 8:
                         cookie_info[key] = f"{value[:4]}...{value[-4:]}"
-                    else:
-                        cookie_info[key] = f"{value[:2]}...{value[-2:]}"
                 else:
                     cookie_info[key] = value
             logger.debug(f"Response cookies: {cookie_info}")
@@ -164,10 +153,10 @@ class ArtFightClient:
                 logger.info(f"Updated CF clearance cookie: {new_clearance[:4]}...{new_clearance[-4:]}")
 
         # Update remember web cookie
-        if 'remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d' in response.cookies:
-            new_remember = response.cookies['remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d']
-            if new_remember != self.cookies.get('remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d'):
-                self.cookies['remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d'] = new_remember
+        if f"remember_web_{REMEMBER_WEB_COOKIE_SUFFIX}" in response.cookies:
+            new_remember = response.cookies[f"remember_web_{REMEMBER_WEB_COOKIE_SUFFIX}"]
+            if new_remember != self.cookies.get(f"remember_web_{REMEMBER_WEB_COOKIE_SUFFIX}"):
+                self.cookies[f"remember_web_{REMEMBER_WEB_COOKIE_SUFFIX}"] = new_remember
                 cookies_updated = True
                 logger.info(f"Updated remember web cookie: {new_remember[:4]}...{new_remember[-4:]}")
 
@@ -179,124 +168,67 @@ class ArtFightClient:
             # Clear authentication cache since cookies changed
             self.clear_auth_cache()
 
-    async def _fetch_user_content(self, username: str, content_type: str) -> list:
+    async def _fetch_user_content(self, username: str, content_type: str) -> Sequence[ArtFightAttack | ArtFightDefense]:
         """Shared method for fetching attacks or defenses with pagination."""
         logger.info(f"Fetching {content_type} for user: {username}")
 
         # Check rate limit
         if not self.rate_limiter.can_request(f"{content_type}_{username}"):
-            # Return existing data from database if rate limited
-            logger.info(f"Rate limited for {content_type}_{username}, returning existing {content_type} from database")
+            logger.info(f"Rate limited for {content_type}_{username}, returning existing data from database.")
             if content_type == "attacks":
-                return self.database.get_attacks_for_user(username)
+                return self.database.get_attacks_for_users([username])
             else:
-                return self.database.get_defenses_for_user(username)
+                return self.database.get_defenses_for_users([username])
 
         try:
-            # Check authentication first if session cookie is provided
             if settings.laravel_session and not await self.validate_authentication():
-                logger.warning(f"Authentication failed for {content_type} - session cookie may be invalid")
+                logger.warning(f"Authentication failed for {content_type} - session may be invalid.")
                 return []
 
-            all_items = []
+            all_items: list[ArtFightAttack | ArtFightDefense] = []
             page = 1
             base_url = urljoin(self.base_url, f"/~{username}/{content_type}")
 
             while True:
-                # Construct URL for current page
-                if page == 1:
-                    page_url = base_url
-                else:
-                    page_url = f"{base_url}?page={page}"
-
+                page_url = f"{base_url}?page={page}"
                 logger.debug(f"Fetching {content_type} page {page}: {page_url}")
-                self._log_request("GET", page_url, cookies=self.cookies)
 
                 response = await self.client.get(page_url)
                 self._log_response(response)
                 response.raise_for_status()
 
-                # Parse items from the page
-                logger.debug(f"Parsing {content_type} from HTML (content length: {len(response.text)})")
                 if content_type == "attacks":
                     page_items = self._parse_attacks_from_html(response.text, username)
-                else:
-                    page_items = self._parse_defenses_from_html(response.text, username)
-
-                logger.debug(f"Found {len(page_items)} {content_type} on page {page}")
-
-                # Check for new items
-                if content_type == "attacks":
                     existing_ids = self.database.get_existing_attack_ids(username)
                 else:
+                    page_items = self._parse_defenses_from_html(response.text, username)
                     existing_ids = self.database.get_existing_defense_ids(username)
                 
-                new_items = [item for item in page_items if item.id not in existing_ids]
-                logger.debug(f"Found {len(new_items)} new {content_type} out of {len(page_items)} total on first page")
-
-                # If no new items found on first page, stop pagination
-                if not new_items:
-                    logger.debug(f"No new {content_type} found, stopping pagination")
+                if not page_items:
                     break
 
+                new_items = [item for item in page_items if item.id not in existing_ids]
                 all_items.extend(page_items)
 
-                # Check if there's a next page
+                if not new_items and page > 1:
+                    break
+
                 if not self._has_next_page(response.text):
-                    logger.debug(f"No more pages found, stopping at page {page}")
                     break
 
-                # Add delay before next page request
-                if page < 10:  # Limit to reasonable number of pages
-                    delay = self._calculate_page_delay()
-                    logger.debug(f"Waiting {delay:.2f} seconds before next page request")
-                    await asyncio.sleep(delay)
-                    page += 1
-                else:
-                    logger.warning(f"Reached maximum page limit ({page}), stopping pagination")
-                    break
+                page += 1
+                await asyncio.sleep(self._calculate_page_delay())
 
-            # Save items to database
-            if all_items:
-                if content_type == "attacks":
-                    self.database.save_attacks(all_items)
-                else:
-                    self.database.save_defenses(all_items)
-
-            # Record the request
-            self.rate_limiter.record_request(f"{content_type}_{username}")
-
-            logger.info(f"Successfully fetched {len(all_items)} {content_type} for user {username} across {page} pages")
-            # return items from db
-            if content_type == "attacks":
-                return self.database.get_attacks_for_user(username)
-            else:
-                return self.database.get_defenses_for_user(username)
-
-        except httpx.HTTPError as e:
+            return all_items
+        except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error fetching {content_type} for {username}: {e}")
-            # Try to get response from the exception
-            try:
-                response = getattr(e, 'response', None)
-                if response:
-                    self._log_response(response)
-            except Exception:
-                pass
             return []
         except Exception as e:
-            logger.error(f"Unexpected error fetching {content_type} for {username}: {e}")
+            logger.error(f"Error fetching {content_type} for {username}: {e}")
             return []
 
-    async def get_user_attacks(self, username: str) -> list[ArtFightAttack]:
-        """Get attacks for a specific user with pagination."""
-        return await self._fetch_user_content(username, "attacks")
-
-    async def get_user_defenses(self, username: str) -> list[ArtFightDefense]:
-        """Get defenses for a specific user with pagination."""
-        return await self._fetch_user_content(username, "defenses")
-
     async def validate_authentication(self) -> bool:
-        """Validate that the session cookie is still valid with 5-minute caching."""
+        """Validate authentication by checking a protected page."""
         if not settings.laravel_session:
             logger.debug("No Laravel session configured, skipping authentication validation")
             return False
