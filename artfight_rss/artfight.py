@@ -219,6 +219,21 @@ class ArtFightClient:
                 page += 1
                 await asyncio.sleep(self._calculate_page_delay())
 
+            # Save all fetched items to database
+            if all_items:
+                if content_type == "attacks":
+                    attacks = [item for item in all_items if isinstance(item, ArtFightAttack)]
+                    if attacks:
+                        self.database.save_attacks(attacks)
+                        logger.debug(f"Saved {len(attacks)} attacks to database for {username}")
+                elif content_type == "defenses":  # defenses
+                    defenses = [item for item in all_items if isinstance(item, ArtFightDefense)]
+                    if defenses:
+                        self.database.save_defenses(defenses)
+                        logger.debug(f"Saved {len(defenses)} defenses to database for {username}")
+                else:
+                    raise ValueError(f"Invalid content type: {content_type}")
+
             return all_items
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error fetching {content_type} for {username}: {e}")

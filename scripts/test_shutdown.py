@@ -57,4 +57,5 @@ if __name__ == "__main__":
         print("\n✅ Shutdown test completed successfully!")
     except Exception as e:
         print(f"\n❌ Shutdown test failed: {e}")
-        sys.exit(1) ``
+        sys.exit(1)
+`
