@@ -170,8 +170,8 @@ def main():
         Path("data/artfight.db"),
         Path("data/artfight_data.db"),
         Path("artfight_rss/data/artfight.db"),
-        Path("artfight_rss/data/artfight_data.db")
-        Path("artfight_data.db")
+        Path("artfight_rss/data/artfight_data.db"),
+        Path("artfight_data.db"),
     ]
     
     db_path = None
