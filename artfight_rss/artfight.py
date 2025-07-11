@@ -672,7 +672,7 @@ class ArtFightClient:
             logger.error(f"Error extracting width percentage: {e}")
             return None
 
-    def _parse_team_metrics_from_html(self, html: str) -> dict:
+    def _parse_team_metrics_from_html(self, html: str) -> dict: # type: ignore
         """Parse detailed team metrics from the event page HTML."""
         soup = BeautifulSoup(html, "html.parser")
         metrics = {
@@ -699,7 +699,7 @@ class ArtFightClient:
             
             for card in team_cards:
                 # Look for the card structure
-                card_div = card.find("div", class_="card")
+                card_div = card.find("div", class_="card") # type: ignore
                 if not card_div:
                     continue
                 

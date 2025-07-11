@@ -1,11 +1,13 @@
 """Main FastAPI application for the ArtFight RSS service."""
 
 import asyncio
+import os
 import signal
+import subprocess
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from .artfight import ArtFightClient
@@ -14,12 +16,9 @@ from .config import settings
 from .database import ArtFightDatabase
 from .discord_bot import discord_bot
 from .event_handlers import setup_event_handlers
-from .logging_config import setup_logging, get_logger
+from .logging_config import get_logger, setup_logging
 from .monitor import ArtFightMonitor
 from .rss import rss_generator
-import os
-import subprocess
-import sys
 
 # Set up logging configuration
 setup_logging()
@@ -36,15 +35,15 @@ def run_migrations():
     """Run database migrations automatically."""
     try:
         logger.info("Running database migrations...")
-        
+
         # Ensure database directory exists
         settings.db_path.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Database directory ensured: {settings.db_path.parent}")
-        
+
         # Use the project root directory for alembic commands
         project_root = settings.db_path.parent.parent
         logger.debug(f"Using project root for migrations: {project_root}")
-        
+
         result = subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],
             capture_output=True,
@@ -52,7 +51,7 @@ def run_migrations():
             cwd=project_root,
             env={**os.environ, "PYTHONPATH": str(project_root)}
         )
-        
+
         if result.returncode == 0:
             logger.info("Database migrations completed successfully")
             if result.stdout:
@@ -62,7 +61,7 @@ def run_migrations():
             logger.error(f"Migration stdout: {result.stdout}")
             logger.error(f"Migration stderr: {result.stderr}")
             raise RuntimeError(f"Database migration failed: {result.stderr}")
-            
+
     except Exception as e:
         logger.error(f"Failed to run migrations: {e}")
         raise
@@ -76,7 +75,7 @@ async def lifespan(app: FastAPI):
     # Run database migrations
     run_migrations()
 
-    
+
     logger.info("Starting ArtFight RSS service...")
 
 
@@ -95,13 +94,15 @@ async def lifespan(app: FastAPI):
     # Start Discord bot
     if settings.discord_enabled:
         logger.info("Starting Discord bot...")
+        # Set the database instance on the Discord bot for rate limit access
+        discord_bot.set_database(database)
         await discord_bot.start()
         logger.info("Discord bot started")
 
     logger.info("ArtFight RSS service started successfully")
-    
+
     yield
-    
+
     # Cleanup
     logger.info("Shutting down ArtFight RSS service...")
     if settings.discord_enabled:
@@ -142,7 +143,7 @@ def validate_users(usernames: str) -> list[str]:
                 status_code=403,
                 detail=f"Users not allowed: {', '.join(invalid_users)}"
             )
-    
+
     return username_list
 
 
@@ -190,7 +191,7 @@ async def get_multiuser_attacks_rss(
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
-        
+
         # Get attacks for all users
         attacks = database.get_attacks_for_users(username_list, limit=limit)
         feed = rss_generator.generate_multiuser_attacks_feed(username_list, attacks)
@@ -212,7 +213,7 @@ async def get_multiuser_defenses_rss(
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
-        
+
         # Get defenses for all users
         defenses = database.get_defenses_for_users(username_list, limit=limit)
         feed = rss_generator.generate_multiuser_defenses_feed(username_list, defenses)
@@ -234,7 +235,7 @@ async def get_multiuser_combined_rss(
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
-        
+
         # Get both attacks and defenses for all users
         # For combined feeds, split the limit between attacks and defenses
         if limit:
@@ -336,7 +337,7 @@ async def fetch_and_emit_events_for_users(usernames: list[str]) -> None:
 def graceful_shutdown(signal, frame):
     """Handle graceful shutdown."""
     logger.info(f"Received signal {signal}, shutting down...")
-    
+
     # Schedule the async shutdown logic to run in the event loop
     if asyncio.get_event_loop().is_running():
         asyncio.get_event_loop().create_task(shutdown_logic())
@@ -349,17 +350,17 @@ def graceful_shutdown(signal, frame):
 async def shutdown_logic():
     """Contains the actual shutdown logic."""
     logger.info("Starting graceful shutdown...")
-    
+
     # Stop monitoring and other background tasks
     if 'monitor' in globals() and monitor:
         await monitor.stop()
-        
+
     # Stop the Discord bot
     if 'discord_bot' in globals() and discord_bot:
         await discord_bot.stop()
 
     logger.info("Graceful shutdown complete.")
-    
+
     # Exit the process after cleanup
     sys.exit(0)
 

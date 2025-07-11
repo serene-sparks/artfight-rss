@@ -3,12 +3,11 @@
 import asyncio
 import io
 from datetime import UTC, datetime
-from pathlib import Path
 
 import discord
+from aiohttp import ClientSession
 from discord import app_commands
 from discord.ext import commands
-from aiohttp import ClientSession
 
 from .config import settings
 from .logging_config import get_logger
@@ -20,7 +19,7 @@ logger = get_logger(__name__)
 class ArtFightDiscordBot:
     """Discord bot for ArtFight notifications and commands."""
 
-    def __init__(self):
+    def __init__(self, database=None):
         """Initialize the Discord bot."""
         self.bot: commands.Bot | None = None
         self.webhook: discord.Webhook | None = None
@@ -28,6 +27,11 @@ class ArtFightDiscordBot:
         self.running = False
         self.ready_event = asyncio.Event()
         self.bot_task: asyncio.Task | None = None
+        self.database = database
+
+    def set_database(self, database):
+        """Set the database instance for accessing rate limit data."""
+        self.database = database
 
     async def start(self):
         """Start the Discord bot or webhook."""
@@ -60,14 +64,14 @@ class ArtFightDiscordBot:
                 await asyncio.wait_for(self.bot_task, timeout=5.0)
             except asyncio.CancelledError:
                 pass
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Discord bot task did not stop within timeout")
 
         # Close the bot if it exists
         if self.bot:
             try:
                 await asyncio.wait_for(self.bot.close(), timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Discord bot did not close within timeout")
 
         logger.info("Discord bot stopped")
@@ -81,7 +85,7 @@ class ArtFightDiscordBot:
         async def on_ready():
             if not self.bot or not self.bot.user:
                 return
-                
+
             logger.info(f"Discord bot logged in as {self.bot.user}")
 
             # Set up channel for notifications
@@ -109,7 +113,7 @@ class ArtFightDiscordBot:
             self.bot_task = asyncio.create_task(self.bot.start(settings.discord_token))
             await asyncio.wait_for(self.ready_event.wait(), timeout=float(settings.discord_startup_timeout))
             logger.info("Discord bot is ready and operational.")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Discord bot failed to become ready within {settings.discord_startup_timeout}s timeout.")
             if self.bot_task:
                 self.bot_task.cancel()
@@ -124,7 +128,7 @@ class ArtFightDiscordBot:
         """Start webhook-only mode."""
         if not settings.discord_webhook_url:
             raise ValueError("Discord webhook URL is required for webhook mode")
-        
+
         self.webhook = discord.Webhook.from_url(
             settings.discord_webhook_url,
             session=ClientSession()
@@ -222,6 +226,55 @@ class ArtFightDiscordBot:
                   f"**Leader Changes:** {settings.discord_notify_leader_changes}",
             inline=False
         )
+
+        # Add rate limit information if database is available
+        if self.database:
+            # Get team rate limit info
+            team_rate_limit = self.database.get_rate_limit("teams")
+            team_status = "Rate limited" if team_rate_limit else "Available"
+            if team_rate_limit:
+                # Format the timestamp to be more readable
+                team_last_request = team_rate_limit.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                team_last_request = "Never"
+
+            embed.add_field(
+                name="Team Monitoring",
+                value=f"**Status:** {team_status}\n"
+                      f"**Last Request:** {team_last_request}",
+                inline=True
+            )
+
+            # Get monitored users rate limit info
+            user_rate_limits = []
+            for user in settings.monitor_list:
+                user_rate_limit = self.database.get_rate_limit(f"user_{user}")
+                user_status = "Rate limited" if user_rate_limit else "Available"
+                if user_rate_limit:
+                    # Format the timestamp to be more readable
+                    user_last_request = user_rate_limit.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    user_last_request = "Never"
+                user_rate_limits.append(f"**{user}:** {user_status} (Last: {user_last_request})")
+
+            if user_rate_limits:
+                # If there are many users, split into multiple fields to avoid Discord's field length limit
+                if len(user_rate_limits) <= 5:
+                    embed.add_field(
+                        name="User Monitoring",
+                        value="\n".join(user_rate_limits),
+                        inline=True
+                    )
+                else:
+                    # Split into chunks of 5 users per field
+                    for i in range(0, len(user_rate_limits), 5):
+                        chunk = user_rate_limits[i:i+5]
+                        field_name = f"User Monitoring ({i+1}-{min(i+5, len(user_rate_limits))})"
+                        embed.add_field(
+                            name=field_name,
+                            value="\n".join(chunk),
+                            inline=True
+                        )
 
         await interaction.followup.send(embed=embed)
 
@@ -400,11 +453,11 @@ class ArtFightDiscordBot:
             value=f"{100 - standing.team1_percentage:.5f}%",
             inline=True
         )
-        
+
         # Add detailed metrics if available
         if any([standing.team1_users, standing.team1_attacks, standing.team1_friendly_fire,
                 standing.team2_users, standing.team2_attacks, standing.team2_friendly_fire]):
-            
+
             # Create detailed metrics field
             metrics_lines = []
             if standing.team1_users and standing.team2_users:
@@ -419,7 +472,7 @@ class ArtFightDiscordBot:
                 metrics_lines.append(f"📊 **Avg Points**: {standing.team1_avg_points:.2f} | {standing.team2_avg_points:.2f}")
             if standing.team1_avg_attacks and standing.team2_avg_attacks:
                 metrics_lines.append(f"🎯 **Avg Attacks**: {standing.team1_avg_attacks:.2f} | {standing.team2_avg_attacks:.2f}")
-            
+
             if metrics_lines:
                 embed.add_field(
                     name="📈 Detailed Metrics",
@@ -474,11 +527,11 @@ class ArtFightDiscordBot:
             value=f"{100 - standing.team1_percentage:.5f}%",
             inline=True
         )
-        
+
         # Add detailed metrics if available
         if any([standing.team1_users, standing.team1_attacks, standing.team1_friendly_fire,
                 standing.team2_users, standing.team2_attacks, standing.team2_friendly_fire]):
-            
+
             # Create detailed metrics field
             metrics_lines = []
             if standing.team1_users and standing.team2_users:
@@ -493,7 +546,7 @@ class ArtFightDiscordBot:
                 metrics_lines.append(f"📊 **Avg Points**: {standing.team1_avg_points:.2f} | {standing.team2_avg_points:.2f}")
             if standing.team1_avg_attacks and standing.team2_avg_attacks:
                 metrics_lines.append(f"🎯 **Avg Attacks**: {standing.team1_avg_attacks:.2f} | {standing.team2_avg_attacks:.2f}")
-            
+
             if metrics_lines:
                 embed.add_field(
                     name="📈 Detailed Metrics",
@@ -538,20 +591,21 @@ class ArtFightDiscordBot:
         """Generate a team standings plot and return it as a Discord file."""
         try:
             # Import matplotlib here to avoid adding it as a main dependency
-            import matplotlib.pyplot as plt
-            import matplotlib.dates as mdates
             import sqlite3
-            
+
+            import matplotlib.dates as mdates
+            import matplotlib.pyplot as plt
+
             # Get database path
             db_path = settings.db_path
             if not db_path.exists():
                 logger.warning("Database file not found for plotting")
                 return None
-            
+
             # Fetch standings data
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            
+
             cursor.execute("""
                 SELECT team1_percentage, fetched_at, leader_change,
                        team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
@@ -559,93 +613,93 @@ class ArtFightDiscordBot:
                 FROM team_standings
                 ORDER BY fetched_at ASC
             """)
-            
+
             data = cursor.fetchall()
             conn.close()
-            
+
             if not data:
                 logger.warning("No team standings data found for plotting")
                 return None
-            
+
             # Parse the data
             team1_percentages = []
             fetched_times = []
             leader_changes = []
-            
+
             for row in data:
                 (team1_percentage, fetched_at_str, leader_change,
                  team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
                  team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
-                
+
                 # Parse the datetime string
                 try:
                     fetched_at = datetime.fromisoformat(fetched_at_str)
                 except ValueError:
                     # Try alternative format if needed
                     fetched_at = datetime.strptime(fetched_at_str, "%Y-%m-%d %H:%M:%S")
-                
+
                 team1_percentages.append(team1_percentage)
                 fetched_times.append(fetched_at)
                 leader_changes.append(bool(leader_change))
-            
+
             # Create the plot
             fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-            
+
             # Plot team percentages over time
             ax.plot(fetched_times, team1_percentages, 'b-', linewidth=2, label=f'{team1_name} %')
-            
+
             # Add a horizontal line at 50% to show the center
             ax.axhline(y=50, color='gray', linestyle='--', alpha=0.7, label='Center (50%)')
-            
+
             # Highlight leader changes
             leader_change_times = [fetched_times[i] for i in range(len(leader_changes)) if leader_changes[i]]
             leader_change_percentages = [team1_percentages[i] for i in range(len(leader_changes)) if leader_changes[i]]
-            
+
             if leader_change_times:
-                ax.scatter(leader_change_times, leader_change_percentages, 
+                ax.scatter(leader_change_times, leader_change_percentages,
                            color='orange', s=100, zorder=5, label='Leader Change', marker='*')
-            
+
             # Format the plot
             ax.set_ylabel('Percentage (%)', fontsize=12)
             ax.set_xlabel('Time', fontsize=12)
-            ax.set_title(f'ArtFight Team Standings Over Time\n{team1_name} vs {team2_name}', 
+            ax.set_title(f'ArtFight Team Standings Over Time\n{team1_name} vs {team2_name}',
                           fontsize=14, fontweight='bold')
             ax.legend(loc='upper left')
             ax.grid(True, alpha=0.3)
-            
+
             # Calculate y-axis limits based on largest distance from 50%
             differences = [abs(p - 50) for p in team1_percentages]
             max_distance = max(differences)
-            
+
             # Set min and max at 15% more than the largest distance from 50%
             padding = max_distance * 0.15
             y_min = max(0, 50 - max_distance - padding)
             y_max = min(100, 50 + max_distance + padding)
-            
+
             ax.set_ylim(y_min, y_max)
-            
+
             # Format x-axis dates
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
             ax.xaxis.set_major_locator(mdates.AutoDateLocator())
             plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
-            
+
             # Adjust layout
             plt.tight_layout()
-            
+
             # Save plot to bytes buffer
             buffer = io.BytesIO()
             fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
             buffer.seek(0)
-            
+
             # Close the figure to free memory
             plt.close(fig)
-            
+
             # Create Discord file
             file = discord.File(buffer, filename="team_standings.png")
-            
+
             logger.info("Team standings plot generated successfully")
             return file
-            
+
         except ImportError:
             logger.warning("matplotlib not available for plotting")
             return None
