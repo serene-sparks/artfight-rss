@@ -204,12 +204,6 @@ class Settings(BaseSettings):
         else:
             return []
 
-    # Cache settings
-    cache_db_path: Path = Field(
-        default=Path("cache/artfight_cache.db"),
-        description="Path to SQLite cache database"
-    )
-
     # ArtFight settings
     artfight_base_url: str = Field(
         default="https://artfight.net",

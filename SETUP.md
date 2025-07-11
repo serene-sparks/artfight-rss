@@ -67,9 +67,6 @@ host = "0.0.0.0"
 port = 8000
 debug = true
 
-# Cache settings
-cache_db_path = "cache/artfight_cache.db"
-
 # Team configuration
 [teams]
 team1 = { name = "Fossils", color = "#BA8C25" }
@@ -322,7 +319,6 @@ The service provides detailed logging:
 ### Database
 The service uses SQLite databases:
 - `artfight_data.db` - Main database for attacks, defenses, and team standings
-- `cache/artfight_cache.db` - Cache database for rate limiting
 
 ## Troubleshooting
 

@@ -1,15 +1,13 @@
 """Permanent database system for ArtFight RSS service."""
 
+import json
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from .config import settings
-from .logging_config import get_logger
-from .models import ArtFightAttack, ArtFightDefense, TeamStanding
-
-logger = get_logger(__name__)
+from .models import ArtFightAttack, ArtFightDefense, TeamStanding, CacheEntry
 
 
 def ensure_timezone_aware(dt: datetime) -> datetime:
@@ -94,6 +92,16 @@ class ArtFightDatabase:
                     leader_change INTEGER NOT NULL DEFAULT 0,
                     first_seen TEXT NOT NULL,
                     last_updated TEXT NOT NULL
+                )
+            """)
+
+            # Create cache entries table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS cache_entries (
+                    key TEXT PRIMARY KEY,
+                    data TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    ttl INTEGER NOT NULL
                 )
             """)
 
@@ -435,7 +443,9 @@ class ArtFightDatabase:
                 standing = TeamStanding(
                     team1_percentage=team1_percentage,
                     fetched_at=fetched_at_dt,
-                    leader_change=bool(leader_change)
+                    leader_change=bool(leader_change),
+                    first_seen=fetched_at_dt,
+                    last_updated=fetched_at_dt
                 )
                 return [standing]
 
@@ -469,7 +479,9 @@ class ArtFightDatabase:
                 standing = TeamStanding(
                     team1_percentage=team1_percentage,
                     fetched_at=fetched_at_dt,
-                    leader_change=bool(leader_change)
+                    leader_change=bool(leader_change),
+                    first_seen=fetched_at_dt,
+                    last_updated=fetched_at_dt
                 )
                 standings.append(standing)
 
@@ -500,7 +512,9 @@ class ArtFightDatabase:
                 standing = TeamStanding(
                     team1_percentage=team1_percentage,
                     fetched_at=fetched_at_dt,
-                    leader_change=bool(leader_change)
+                    leader_change=bool(leader_change),
+                    first_seen=fetched_at_dt,
+                    last_updated=fetched_at_dt
                 )
                 all_standings.append(standing)
 
@@ -546,3 +560,85 @@ class ArtFightDatabase:
                 unique_standings = unique_standings[:validated_limit]
 
             return unique_standings
+
+    # Cache methods
+    def get_cache(self, key: str) -> Any | None:
+        """Get value from cache."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT data, timestamp, ttl FROM cache_entries WHERE key = ?",
+                (key,)
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return None
+
+            data_str, timestamp_str, ttl = row
+            timestamp = ensure_timezone_aware(datetime.fromisoformat(timestamp_str))
+
+            # Check if expired
+            age = (datetime.now(UTC) - timestamp).total_seconds()
+            if age > ttl:
+                # Remove expired entry
+                conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
+                conn.commit()
+                return None
+
+            return json.loads(data_str)
+
+    def set_cache(self, key: str, data: Any, ttl: int) -> None:
+        """Set value in cache with TTL."""
+        data_str = json.dumps(data, default=str)
+        timestamp = datetime.now(UTC).isoformat()
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO cache_entries (key, data, timestamp, ttl)
+                VALUES (?, ?, ?, ?)
+            """, (key, data_str, timestamp, ttl))
+            conn.commit()
+
+    def delete_cache(self, key: str) -> None:
+        """Delete value from cache."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
+            conn.commit()
+
+    def clear_cache(self) -> None:
+        """Clear all cache entries."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM cache_entries")
+            conn.commit()
+
+    def cleanup_expired_cache(self) -> None:
+        """Remove expired entries from cache."""
+        with sqlite3.connect(self.db_path) as conn:
+            # Get all entries
+            cursor = conn.execute("SELECT key, timestamp, ttl FROM cache_entries")
+            expired_keys = []
+
+            for row in cursor.fetchall():
+                key, timestamp_str, ttl = row
+                timestamp = ensure_timezone_aware(datetime.fromisoformat(timestamp_str))
+                age = (datetime.now(UTC) - timestamp).total_seconds()
+
+                if age > ttl:
+                    expired_keys.append(key)
+
+            # Delete expired entries
+            if expired_keys:
+                placeholders = ','.join('?' * len(expired_keys))
+                conn.execute(f"DELETE FROM cache_entries WHERE key IN ({placeholders})", expired_keys)
+                conn.commit()
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache statistics."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM cache_entries")
+            total_entries = cursor.fetchone()[0]
+
+            return {
+                "total_entries": total_entries,
+                "database_path": str(self.db_path),
+            }

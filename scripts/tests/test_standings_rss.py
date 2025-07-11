@@ -22,9 +22,9 @@ async def test_standings_rss():
     print("=" * 50)
 
     # Initialize components
-    cache = SQLiteCache(db_path=settings.cache_db_path)
-    rate_limiter = RateLimiter(cache, settings.request_interval)
     database = ArtFightDatabase(db_path=settings.db_path)
+    cache = SQLiteCache(database)
+    rate_limiter = RateLimiter(database, settings.request_interval)
     client = ArtFightClient(rate_limiter, database)
     atom_gen = AtomGenerator()
 
@@ -53,17 +53,23 @@ async def test_standings_rss():
             TeamStanding(
                 team1_percentage=55.0,  # Team 1 leading
                 fetched_at=datetime.now() - timedelta(days=3, hours=12),
-                leader_change=False
+                leader_change=False,
+                first_seen=datetime.now() - timedelta(days=3, hours=12),
+                last_updated=datetime.now() - timedelta(days=3, hours=12)
             ),
             TeamStanding(
                 team1_percentage=56.0,  # Still Team 1 leading
                 fetched_at=datetime.now() - timedelta(days=3, hours=6),
-                leader_change=False
+                leader_change=False,
+                first_seen=datetime.now() - timedelta(days=3, hours=6),
+                last_updated=datetime.now() - timedelta(days=3, hours=6)
             ),
             TeamStanding(
                 team1_percentage=57.0,  # Still Team 1 leading
                 fetched_at=datetime.now() - timedelta(days=3, hours=1),
-                leader_change=False
+                leader_change=False,
+                first_seen=datetime.now() - timedelta(days=3, hours=1),
+                last_updated=datetime.now() - timedelta(days=3, hours=1)
             )
         ]
 

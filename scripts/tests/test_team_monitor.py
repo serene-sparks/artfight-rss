@@ -20,9 +20,9 @@ async def test_team_monitor():
     print("=" * 50)
 
     # Initialize components
-    cache = SQLiteCache(db_path=settings.cache_db_path)
-    rate_limiter = RateLimiter(cache, settings.request_interval)
     database = ArtFightDatabase(db_path=settings.db_path)
+    cache = SQLiteCache(database)
+    rate_limiter = RateLimiter(database, settings.request_interval)
     monitor = ArtFightMonitor(cache, rate_limiter, database)
 
     try:

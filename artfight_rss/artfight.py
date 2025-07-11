@@ -510,12 +510,12 @@ class ArtFightClient:
                 logger.warning("Authentication failed for team standings - session cookie may be invalid")
                 return []
 
-            # Fetch teams page
-            teams_url = urljoin(self.base_url, "/")
-            logger.info("Fetching team standings")
-            self._log_request("GET", teams_url, cookies=self.cookies)
+            # Fetch event page (contains both progress bars and detailed metrics)
+            event_url = urljoin(self.base_url, "/event")
+            logger.info("Fetching team standings from event page")
+            self._log_request("GET", event_url, cookies=self.cookies)
 
-            response = await self.client.get(teams_url)
+            response = await self.client.get(event_url)
             self._log_response(response)
             response.raise_for_status()
 
@@ -572,10 +572,14 @@ class ArtFightClient:
         if team1_percentage is not None:
             fetched_at = datetime.now(UTC)
 
+            # Parse detailed team metrics from the event page
+            team_metrics = self._parse_team_metrics_from_html(html)
+
             standing = TeamStanding(
                 team1_percentage=team1_percentage,
                 fetched_at=fetched_at,
-                leader_change=False  # Will be set by database logic
+                leader_change=False,  # Will be set by database logic
+                **team_metrics
             )
             standings.append(standing)
             logger.debug(f"Parsed team standings: Team 1 = {team1_percentage:.2f}%, Team 2 = {100-team1_percentage:.2f}%")
@@ -667,6 +671,172 @@ class ArtFightClient:
         except Exception as e:
             logger.error(f"Error extracting width percentage: {e}")
             return None
+
+    def _parse_team_metrics_from_html(self, html: str) -> dict:
+        """Parse detailed team metrics from the event page HTML."""
+        soup = BeautifulSoup(html, "html.parser")
+        metrics = {
+            'team1_users': 0,
+            'team2_users': 0,
+            'team1_attacks': 0,
+            'team2_attacks': 0,
+            'team1_friendly_fire': 0,
+            'team2_friendly_fire': 0,
+            'team1_battle_ratio': 0.0,
+            'team2_battle_ratio': 0.0,
+            'team1_avg_points': 0.0,
+            'team2_avg_points': 0.0,
+            'team1_avg_attacks': 0.0,
+            'team2_avg_attacks': 0.0,
+        }
+
+        try:
+            # Look for team statistics sections using multiple selectors
+            # The event page typically has team stats in cards, tables, or specific containers
+            team_stats_sections = []
+            
+            # Try different common selectors for team stats
+            selectors = [
+                "div.card",
+                "div.team-stats", 
+                "div.stats",
+                "div.team-info",
+                "table",
+                "div.col-md-6",  # Bootstrap columns often contain team stats
+                "div.col-lg-6"
+            ]
+            
+            for selector in selectors:
+                sections = soup.select(selector)
+                team_stats_sections.extend(sections)
+            
+            logger.debug(f"Found {len(team_stats_sections)} potential team stats sections")
+            
+            for section in team_stats_sections:
+                # Look for team names in card headers (ArtFight's specific structure)
+                # Structure: <div class="card-header"><strong><a href="/team/21.fossils">Fossils</a></strong></div>
+                team_name_elem = section.find("div", class_="card-header")
+                if not team_name_elem:
+                    # Fallback to heading elements
+                    for tag_name in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+                        team_name_elem = section.find(tag_name)
+                        if team_name_elem:
+                            break
+                
+                if not team_name_elem:
+                    continue
+                
+                # Get team name text from card header or heading
+                if team_name_elem.name == "div" and "card-header" in team_name_elem.get("class", []):
+                    # Extract from card header - look for the link text
+                    link_elem = team_name_elem.find("a")
+                    if link_elem:
+                        team_name = link_elem.get_text(strip=True)
+                    else:
+                        team_name = team_name_elem.get_text(strip=True)
+                else:
+                    team_name = team_name_elem.get_text(strip=True)
+                
+                if not team_name:
+                    continue
+                team_name = team_name.lower()
+                
+                # Determine which team this is based on configured team names
+                if not settings.teams:
+                    continue
+                    
+                is_team1 = settings.teams.team1.name.lower() in team_name
+                is_team2 = settings.teams.team2.name.lower() in team_name
+                
+                if not (is_team1 or is_team2):
+                    continue
+                
+                team_prefix = "team1" if is_team1 else "team2"
+                logger.debug(f"Found team section for {team_prefix}: {team_name}")
+                
+                # Parse various metrics from the section using more robust methods
+                # Note: We don't parse "points" here as it's the same as team1_percentage from progress bars
+                self._parse_metric_from_section(section, team_prefix, "users?", r'(\d+)', 'users', metrics, int)
+                self._parse_metric_from_section(section, team_prefix, "attacks?", r'(\d+)', 'attacks', metrics, int)
+                self._parse_metric_from_section(section, team_prefix, "friendly fire", r'(\d+)', 'friendly_fire', metrics, int)
+                self._parse_metric_from_section(section, team_prefix, "battle ratio", r'([\d.]+)', 'battle_ratio', metrics, float)
+                self._parse_metric_from_section(section, team_prefix, "average points", r'([\d.]+)', 'avg_points', metrics, float)
+                self._parse_metric_from_section(section, team_prefix, "average attacks", r'([\d.]+)', 'avg_attacks', metrics, float)
+            
+            logger.debug(f"Parsed team metrics: {metrics}")
+            
+        except Exception as e:
+            logger.error(f"Error parsing team metrics: {e}")
+        
+        return metrics
+
+    def _parse_metric_from_section(self, section, team_prefix: str, search_text: str, 
+                                  regex_pattern: str, metric_name: str, metrics: dict, 
+                                  value_type: type) -> None:
+        """Helper method to parse a specific metric from a section."""
+        try:
+            # Try multiple approaches to find the metric
+            metric_value = None
+            
+            # Approach 1: Look for h4 elements with small tags (ArtFight's specific structure)
+            # This matches the structure: <h4>267217 <small>users</small></h4>
+            for h4_elem in section.find_all('h4'):
+                small_elem = h4_elem.find('small')
+                if small_elem and search_text.lower() in small_elem.get_text().lower():
+                    # Extract the number from the h4 text (before the small tag)
+                    h4_text = h4_elem.get_text()
+                    # Remove the small tag text to get just the number
+                    small_text = small_elem.get_text()
+                    number_text = h4_text.replace(small_text, '').strip()
+                    match = re.search(regex_pattern, number_text)
+                    if match:
+                        metric_value = value_type(match.group(1))
+                        break
+            
+            # Approach 2: Find text containing the metric name (fallback)
+            if metric_value is None:
+                metric_elem = section.find(text=re.compile(search_text, re.I))
+                if metric_elem and hasattr(metric_elem, 'parent') and metric_elem.parent:
+                    parent_text = metric_elem.parent.get_text()
+                    match = re.search(regex_pattern, parent_text)
+                    if match:
+                        metric_value = value_type(match.group(1))
+            
+            # Approach 3: Look for elements with data attributes or specific classes
+            if metric_value is None:
+                # Try to find elements with metric-related classes or IDs
+                for elem in section.find_all(text=True):
+                    if search_text.lower() in elem.lower():
+                        # Look for numbers in nearby elements
+                        parent = elem.parent
+                        if parent:
+                            # Check parent and siblings for numbers
+                            for sibling in [parent] + list(parent.find_next_siblings()):
+                                sibling_text = sibling.get_text()
+                                match = re.search(regex_pattern, sibling_text)
+                                if match:
+                                    metric_value = value_type(match.group(1))
+                                    break
+                        if metric_value is not None:
+                            break
+            
+            # Approach 4: Look for table rows or list items containing the metric
+            if metric_value is None:
+                for elem in section.find_all(['tr', 'li', 'div']):
+                    elem_text = elem.get_text()
+                    if search_text.lower() in elem_text.lower():
+                        match = re.search(regex_pattern, elem_text)
+                        if match:
+                            metric_value = value_type(match.group(1))
+                            break
+            
+            # Store the metric if found
+            if metric_value is not None:
+                metrics[f'{team_prefix}_{metric_name}'] = metric_value
+                logger.debug(f"Found {team_prefix}_{metric_name}: {metric_value}")
+                
+        except Exception as e:
+            logger.debug(f"Error parsing {metric_name} for {team_prefix}: {e}")
 
     def _parse_team1_percentage(self, bar_element) -> float | None:
         """Parse team1 percentage from the first progress bar element."""

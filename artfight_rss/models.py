@@ -1,22 +1,28 @@
 """Data models for the ArtFight webhook service."""
 
 from datetime import UTC, datetime
+from typing import Optional
 
 from feedgen.feed import FeedGenerator
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import HttpUrl
+from sqlmodel import SQLModel, Field as SQLField
 
 
-class ArtFightAttack(BaseModel):
+class ArtFightAttack(SQLModel, table=True):
     """Represents an ArtFight attack."""
 
-    id: str = Field(..., description="Unique attack ID")
-    title: str = Field(..., description="Attack title")
-    description: str | None = Field(default=None, description="Attack description")
-    image_url: HttpUrl | None = Field(default=None, description="Attack image URL")
-    attacker_user: str = Field(..., description="Attacker's username")
-    defender_user: str = Field(..., description="Defender's username")
-    fetched_at: datetime = Field(..., description="When the attack was first fetched")
-    url: HttpUrl = Field(..., description="URL to the attack on ArtFight")
+    __tablename__ = "attacks"
+
+    id: str = SQLField(primary_key=True, description="Unique attack ID")
+    title: str = SQLField(description="Attack title")
+    description: str | None = SQLField(default=None, description="Attack description")
+    image_url: str | None = SQLField(default=None, description="Attack image URL")
+    attacker_user: str = SQLField(description="Attacker's username")
+    defender_user: str = SQLField(description="Defender's username")
+    fetched_at: datetime = SQLField(description="When the attack was first fetched")
+    url: str = SQLField(description="URL to the attack on ArtFight")
+    first_seen: datetime = SQLField(description="When this attack was first seen")
+    last_updated: datetime = SQLField(description="When this attack was last updated")
 
     def to_atom_item(self) -> dict:
         """Convert to Atom item format."""
@@ -31,17 +37,21 @@ class ArtFightAttack(BaseModel):
         }
 
 
-class ArtFightDefense(BaseModel):
+class ArtFightDefense(SQLModel, table=True):
     """Represents an ArtFight defense."""
 
-    id: str = Field(..., description="Unique defense ID")
-    title: str = Field(..., description="Defense title")
-    description: str | None = Field(default=None, description="Defense description")
-    image_url: HttpUrl | None = Field(default=None, description="Defense image URL")
-    defender_user: str = Field(..., description="Defender's username")
-    attacker_user: str = Field(..., description="Attacking user's username")
-    fetched_at: datetime = Field(..., description="When the attack was first fetched")
-    url: HttpUrl = Field(..., description="URL to the defense on ArtFight")
+    __tablename__ = "defenses"
+
+    id: str = SQLField(primary_key=True, description="Unique defense ID")
+    title: str = SQLField(description="Defense title")
+    description: str | None = SQLField(default=None, description="Defense description")
+    image_url: str | None = SQLField(default=None, description="Defense image URL")
+    defender_user: str = SQLField(description="Defender's username")
+    attacker_user: str = SQLField(description="Attacking user's username")
+    fetched_at: datetime = SQLField(description="When the attack was first fetched")
+    url: str = SQLField(description="URL to the defense on ArtFight")
+    first_seen: datetime = SQLField(description="When this defense was first seen")
+    last_updated: datetime = SQLField(description="When this defense was last updated")
 
     def to_atom_item(self) -> dict:
         """Convert to Atom item format."""
@@ -56,12 +66,32 @@ class ArtFightDefense(BaseModel):
         }
 
 
-class TeamStanding(BaseModel):
+class TeamStanding(SQLModel, table=True):
     """Represents a team standing update."""
 
-    team1_percentage: float = Field(..., description="Percentage of team 1 (0.0-100.0)")
-    fetched_at: datetime = Field(..., description="When the standing was first fetched")
-    leader_change: bool = Field(default=False, description="Whether this represents a leader change")
+    __tablename__ = "team_standings"
+
+    id: int | None = SQLField(default=None, primary_key=True, description="Primary key")
+    team1_percentage: float = SQLField(description="Percentage of team 1 (0.0-100.0)")
+    fetched_at: datetime = SQLField(description="When the standing was first fetched")
+    leader_change: bool = SQLField(default=False, description="Whether this represents a leader change")
+    first_seen: datetime = SQLField(description="When this standing was first seen")
+    last_updated: datetime = SQLField(description="When this standing was last updated")
+    
+    # Additional team metrics
+    team1_users: int | None = SQLField(default=None, description="Number of users on team 1")
+    team1_attacks: int | None = SQLField(default=None, description="Number of attacks by team 1")
+    team1_friendly_fire: int | None = SQLField(default=None, description="Number of friendly fire attacks by team 1")
+    team1_battle_ratio: float | None = SQLField(default=None, description="Battle ratio for team 1 (0.0-100.0)")
+    team1_avg_points: float | None = SQLField(default=None, description="Average points per user for team 1")
+    team1_avg_attacks: float | None = SQLField(default=None, description="Average attacks per user for team 1")
+    
+    team2_users: int | None = SQLField(default=None, description="Number of users on team 2")
+    team2_attacks: int | None = SQLField(default=None, description="Number of attacks by team 2")
+    team2_friendly_fire: int | None = SQLField(default=None, description="Number of friendly fire attacks by team 2")
+    team2_battle_ratio: float | None = SQLField(default=None, description="Battle ratio for team 2 (0.0-100.0)")
+    team2_avg_points: float | None = SQLField(default=None, description="Average points per user for team 2")
+    team2_avg_attacks: float | None = SQLField(default=None, description="Average attacks per user for team 2")
 
     def to_atom_item(self) -> dict:
         """Convert to Atom item format."""
@@ -98,13 +128,22 @@ class TeamStanding(BaseModel):
         }
 
 
-class CacheEntry(BaseModel):
+class RateLimit(SQLModel, table=True):
+    """SQLAlchemy model for rate_limits table."""
+    __tablename__ = "rate_limits"
+
+    key: str = SQLField(primary_key=True, description="Rate limit key")
+    last_request: datetime = SQLField(description="When the last request was made")
+    min_interval: int = SQLField(description="Minimum interval between requests in seconds")
+
+
+class CacheEntry(SQLModel, table=True):
     """Cache entry for storing data between requests."""
 
-    key: str = Field(..., description="Cache key")
-    data: dict = Field(..., description="Cached data")
-    timestamp: datetime = Field(..., description="When this entry was created")
-    ttl: int = Field(..., description="Time to live in seconds")
+    key: str = SQLField(primary_key=True, description="Cache key")
+    data: str = SQLField(description="Cached data as JSON string")
+    timestamp: datetime = SQLField(description="When this entry was created")
+    ttl: int = SQLField(description="Time to live in seconds")
 
     def is_expired(self) -> bool:
         """Check if the cache entry has expired."""

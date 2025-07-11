@@ -415,7 +415,7 @@ class ArtFightDiscordBot:
                 await self._send_embed(embed)
         except Exception as e:
             logger.warning(f"Failed to generate team standings plot: {e}")
-            await self._send_embed(embed)
+        await self._send_embed(embed)
 
     async def send_leader_change_notification(self, standing: TeamStanding):
         """Send a Discord notification for leader changes."""

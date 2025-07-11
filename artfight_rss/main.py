@@ -17,6 +17,9 @@ from .event_handlers import setup_event_handlers
 from .logging_config import setup_logging, get_logger
 from .monitor import ArtFightMonitor
 from .rss import rss_generator
+import os
+import subprocess
+import sys
 
 # Set up logging configuration
 setup_logging()
@@ -29,16 +32,57 @@ database: ArtFightDatabase
 monitor: ArtFightMonitor
 
 
+def run_migrations():
+    """Run database migrations automatically."""
+    try:
+        logger.info("Running database migrations...")
+        
+        # Ensure database directory exists
+        settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Database directory ensured: {settings.db_path.parent}")
+        
+        # Use the project root directory for alembic commands
+        project_root = settings.db_path.parent.parent
+        logger.debug(f"Using project root for migrations: {project_root}")
+        
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            cwd=project_root,
+            env={**os.environ, "PYTHONPATH": str(project_root)}
+        )
+        
+        if result.returncode == 0:
+            logger.info("Database migrations completed successfully")
+            if result.stdout:
+                logger.debug(f"Migration output: {result.stdout}")
+        else:
+            logger.error(f"Migration failed with return code {result.returncode}")
+            logger.error(f"Migration stdout: {result.stdout}")
+            logger.error(f"Migration stderr: {result.stderr}")
+            raise RuntimeError(f"Database migration failed: {result.stderr}")
+            
+    except Exception as e:
+        logger.error(f"Failed to run migrations: {e}")
+        raise
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan."""
     global cache, rate_limiter, database, monitor
 
+    # Run database migrations
+    run_migrations()
+
+    
     logger.info("Starting ArtFight RSS service...")
 
+
     # Initialize components
-    cache = SQLiteCache(settings.cache_db_path)
     database = ArtFightDatabase(settings.db_path)
+    cache = SQLiteCache(database)
     rate_limiter = RateLimiter(database, settings.request_interval)
     monitor = ArtFightMonitor(cache, rate_limiter, database)
 
