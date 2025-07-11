@@ -36,7 +36,9 @@ def fetch_standings_data(db_path):
     
     # Get all standings ordered by time
     cursor.execute("""
-        SELECT team1_percentage, fetched_at, leader_change
+        SELECT team1_percentage, fetched_at, leader_change,
+               team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+               team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
         FROM team_standings
         ORDER BY fetched_at ASC
     """)
@@ -54,7 +56,9 @@ def fetch_standings_data(db_path):
     leader_changes = []
     
     for row in data:
-        team1_percentage, fetched_at_str, leader_change = row
+        (team1_percentage, fetched_at_str, leader_change,
+         team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+         team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
         
         # Parse the datetime string
         try:

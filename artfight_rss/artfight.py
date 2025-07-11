@@ -676,92 +676,77 @@ class ArtFightClient:
         """Parse detailed team metrics from the event page HTML."""
         soup = BeautifulSoup(html, "html.parser")
         metrics = {
-            'team1_users': 0,
-            'team2_users': 0,
-            'team1_attacks': 0,
-            'team2_attacks': 0,
-            'team1_friendly_fire': 0,
-            'team2_friendly_fire': 0,
-            'team1_battle_ratio': 0.0,
-            'team2_battle_ratio': 0.0,
-            'team1_avg_points': 0.0,
-            'team2_avg_points': 0.0,
-            'team1_avg_attacks': 0.0,
-            'team2_avg_attacks': 0.0,
+            'team1_users': None,
+            'team2_users': None,
+            'team1_attacks': None,
+            'team2_attacks': None,
+            'team1_friendly_fire': None,
+            'team2_friendly_fire': None,
+            'team1_battle_ratio': None,
+            'team2_battle_ratio': None,
+            'team1_avg_points': None,
+            'team2_avg_points': None,
+            'team1_avg_attacks': None,
+            'team2_avg_attacks': None,
         }
 
         try:
-            # Look for team statistics sections using multiple selectors
-            # The event page typically has team stats in cards, tables, or specific containers
-            team_stats_sections = []
+            # Look for team statistics cards with the specific structure from the HTML
+            # Structure: <div class="col-md-6"><div class="card"><div class="card-header">...</div><div class="card-body">...</div></div></div>
+            team_cards = soup.find_all("div", class_="col-md-6")
             
-            # Try different common selectors for team stats
-            selectors = [
-                "div.card",
-                "div.team-stats", 
-                "div.stats",
-                "div.team-info",
-                "table",
-                "div.col-md-6",  # Bootstrap columns often contain team stats
-                "div.col-lg-6"
-            ]
+            logger.debug(f"Found {len(team_cards)} potential team cards")
             
-            for selector in selectors:
-                sections = soup.select(selector)
-                team_stats_sections.extend(sections)
-            
-            logger.debug(f"Found {len(team_stats_sections)} potential team stats sections")
-            
-            for section in team_stats_sections:
-                # Look for team names in card headers (ArtFight's specific structure)
-                # Structure: <div class="card-header"><strong><a href="/team/21.fossils">Fossils</a></strong></div>
-                team_name_elem = section.find("div", class_="card-header")
-                if not team_name_elem:
-                    # Fallback to heading elements
-                    for tag_name in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-                        team_name_elem = section.find(tag_name)
-                        if team_name_elem:
-                            break
-                
-                if not team_name_elem:
+            for card in team_cards:
+                # Look for the card structure
+                card_div = card.find("div", class_="card")
+                if not card_div:
                     continue
                 
-                # Get team name text from card header or heading
-                if team_name_elem.name == "div" and "card-header" in team_name_elem.get("class", []):
-                    # Extract from card header - look for the link text
-                    link_elem = team_name_elem.find("a")
-                    if link_elem:
-                        team_name = link_elem.get_text(strip=True)
-                    else:
-                        team_name = team_name_elem.get_text(strip=True)
-                else:
-                    team_name = team_name_elem.get_text(strip=True)
+                # Find the card header with team name
+                card_header = card_div.find("div", class_="card-header")
+                if not card_header:
+                    continue
                 
+                # Extract team name from the link in the header
+                # Structure: <strong><a href="/team/21.fossils">Fossils</a></strong>
+                team_link = card_header.find("a")
+                if not team_link:
+                    continue
+                
+                team_name = team_link.get_text(strip=True)
                 if not team_name:
                     continue
-                team_name = team_name.lower()
+                
+                logger.debug(f"Found team card for: {team_name}")
                 
                 # Determine which team this is based on configured team names
                 if not settings.teams:
                     continue
                     
-                is_team1 = settings.teams.team1.name.lower() in team_name
-                is_team2 = settings.teams.team2.name.lower() in team_name
+                is_team1 = settings.teams.team1.name.lower() in team_name.lower()
+                is_team2 = settings.teams.team2.name.lower() in team_name.lower()
                 
                 if not (is_team1 or is_team2):
+                    logger.debug(f"Team '{team_name}' not in configured teams, skipping")
                     continue
                 
                 team_prefix = "team1" if is_team1 else "team2"
-                logger.debug(f"Found team section for {team_prefix}: {team_name}")
+                logger.debug(f"Processing metrics for {team_prefix}: {team_name}")
                 
-                # Parse various metrics from the section using more robust methods
-                # Note: We don't parse "points" here as it's the same as team1_percentage from progress bars
-                self._parse_metric_from_section(section, team_prefix, "users?", r'(\d+)', 'users', metrics, int)
-                self._parse_metric_from_section(section, team_prefix, "attacks?", r'(\d+)', 'attacks', metrics, int)
-                self._parse_metric_from_section(section, team_prefix, "friendly fire", r'(\d+)', 'friendly_fire', metrics, int)
-                self._parse_metric_from_section(section, team_prefix, "battle ratio", r'([\d.]+)', 'battle_ratio', metrics, float)
-                self._parse_metric_from_section(section, team_prefix, "average points", r'([\d.]+)', 'avg_points', metrics, float)
-                self._parse_metric_from_section(section, team_prefix, "average attacks", r'([\d.]+)', 'avg_attacks', metrics, float)
+                # Find the card body with metrics
+                card_body = card_div.find("div", class_="card-body")
+                if not card_body:
+                    continue
+                
+                # Parse metrics from the card body
+                # Structure: <h4>272912 <small>users</small></h4>
+                self._parse_metric_from_card_body(card_body, team_prefix, "users", r'(\d+)', 'users', metrics, int)
+                self._parse_metric_from_card_body(card_body, team_prefix, "attacks", r'(\d+)', 'attacks', metrics, int)
+                self._parse_metric_from_card_body(card_body, team_prefix, "friendly fire attacks", r'(\d+)', 'friendly_fire', metrics, int)
+                self._parse_metric_from_card_body(card_body, team_prefix, "battle ratio", r'([\d.]+)', 'battle_ratio', metrics, float)
+                self._parse_metric_from_card_body(card_body, team_prefix, "average points", r'([\d.]+)', 'avg_points', metrics, float)
+                self._parse_metric_from_card_body(card_body, team_prefix, "average attacks", r'([\d.]+)', 'avg_attacks', metrics, float)
             
             logger.debug(f"Parsed team metrics: {metrics}")
             
@@ -769,6 +754,33 @@ class ArtFightClient:
             logger.error(f"Error parsing team metrics: {e}")
         
         return metrics
+
+    def _parse_metric_from_card_body(self, card_body, team_prefix: str, search_text: str, 
+                                    regex_pattern: str, metric_name: str, metrics: dict, 
+                                    value_type: type) -> None:
+        """Parse a specific metric from a card body using the ArtFight HTML structure."""
+        try:
+            # Look for h4 elements with small tags (ArtFight's specific structure)
+            # Structure: <h4>272912 <small>users</small></h4>
+            for h4_elem in card_body.find_all('h4'):
+                small_elem = h4_elem.find('small')
+                if small_elem and search_text.lower() in small_elem.get_text().lower():
+                    # Extract the number from the h4 text (before the small tag)
+                    h4_text = h4_elem.get_text()
+                    # Remove the small tag text to get just the number
+                    small_text = small_elem.get_text()
+                    number_text = h4_text.replace(small_text, '').strip()
+                    match = re.search(regex_pattern, number_text)
+                    if match:
+                        metric_value = value_type(match.group(1))
+                        metrics[f'{team_prefix}_{metric_name}'] = metric_value
+                        logger.debug(f"Found {team_prefix}_{metric_name}: {metric_value}")
+                        return
+            
+            logger.debug(f"Could not find {metric_name} for {team_prefix}")
+                
+        except Exception as e:
+            logger.debug(f"Error parsing {metric_name} for {team_prefix}: {e}")
 
     def _parse_metric_from_section(self, section, team_prefix: str, search_text: str, 
                                   regex_pattern: str, metric_name: str, metrics: dict, 

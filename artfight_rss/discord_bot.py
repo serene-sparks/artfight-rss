@@ -400,6 +400,32 @@ class ArtFightDiscordBot:
             value=f"{100 - standing.team1_percentage:.5f}%",
             inline=True
         )
+        
+        # Add detailed metrics if available
+        if any([standing.team1_users, standing.team1_attacks, standing.team1_friendly_fire,
+                standing.team2_users, standing.team2_attacks, standing.team2_friendly_fire]):
+            
+            # Create detailed metrics field
+            metrics_lines = []
+            if standing.team1_users and standing.team2_users:
+                metrics_lines.append(f"👥 **Users**: {standing.team1_users:,} | {standing.team2_users:,}")
+            if standing.team1_attacks and standing.team2_attacks:
+                metrics_lines.append(f"⚔️ **Attacks**: {standing.team1_attacks:,} | {standing.team2_attacks:,}")
+            if standing.team1_friendly_fire and standing.team2_friendly_fire:
+                metrics_lines.append(f"🔥 **Friendly Fire**: {standing.team1_friendly_fire:,} | {standing.team2_friendly_fire:,}")
+            if standing.team1_battle_ratio and standing.team2_battle_ratio:
+                metrics_lines.append(f"⚖️ **Battle Ratio**: {standing.team1_battle_ratio:.2f}% | {standing.team2_battle_ratio:.2f}%")
+            if standing.team1_avg_points and standing.team2_avg_points:
+                metrics_lines.append(f"📊 **Avg Points**: {standing.team1_avg_points:.2f} | {standing.team2_avg_points:.2f}")
+            if standing.team1_avg_attacks and standing.team2_avg_attacks:
+                metrics_lines.append(f"🎯 **Avg Attacks**: {standing.team1_avg_attacks:.2f} | {standing.team2_avg_attacks:.2f}")
+            
+            if metrics_lines:
+                embed.add_field(
+                    name="📈 Detailed Metrics",
+                    value="\n".join(metrics_lines),
+                    inline=False
+                )
 
         if settings.teams:
             embed.set_thumbnail(url=settings.teams.team1.image_url if standing.team1_percentage > 50 else settings.teams.team2.image_url)
@@ -448,6 +474,32 @@ class ArtFightDiscordBot:
             value=f"{100 - standing.team1_percentage:.5f}%",
             inline=True
         )
+        
+        # Add detailed metrics if available
+        if any([standing.team1_users, standing.team1_attacks, standing.team1_friendly_fire,
+                standing.team2_users, standing.team2_attacks, standing.team2_friendly_fire]):
+            
+            # Create detailed metrics field
+            metrics_lines = []
+            if standing.team1_users and standing.team2_users:
+                metrics_lines.append(f"👥 **Users**: {standing.team1_users:,} | {standing.team2_users:,}")
+            if standing.team1_attacks and standing.team2_attacks:
+                metrics_lines.append(f"⚔️ **Attacks**: {standing.team1_attacks:,} | {standing.team2_attacks:,}")
+            if standing.team1_friendly_fire and standing.team2_friendly_fire:
+                metrics_lines.append(f"🔥 **Friendly Fire**: {standing.team1_friendly_fire:,} | {standing.team2_friendly_fire:,}")
+            if standing.team1_battle_ratio and standing.team2_battle_ratio:
+                metrics_lines.append(f"⚖️ **Battle Ratio**: {standing.team1_battle_ratio:.2f}% | {standing.team2_battle_ratio:.2f}%")
+            if standing.team1_avg_points and standing.team2_avg_points:
+                metrics_lines.append(f"📊 **Avg Points**: {standing.team1_avg_points:.2f} | {standing.team2_avg_points:.2f}")
+            if standing.team1_avg_attacks and standing.team2_avg_attacks:
+                metrics_lines.append(f"🎯 **Avg Attacks**: {standing.team1_avg_attacks:.2f} | {standing.team2_avg_attacks:.2f}")
+            
+            if metrics_lines:
+                embed.add_field(
+                    name="📈 Detailed Metrics",
+                    value="\n".join(metrics_lines),
+                    inline=False
+                )
 
         if settings.teams:
             embed.set_thumbnail(url=settings.teams.team1.image_url if standing.team1_percentage > 50 else settings.teams.team2.image_url)
@@ -501,7 +553,9 @@ class ArtFightDiscordBot:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT team1_percentage, fetched_at, leader_change
+                SELECT team1_percentage, fetched_at, leader_change,
+                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
                 FROM team_standings
                 ORDER BY fetched_at ASC
             """)
@@ -519,7 +573,9 @@ class ArtFightDiscordBot:
             leader_changes = []
             
             for row in data:
-                team1_percentage, fetched_at_str, leader_change = row
+                (team1_percentage, fetched_at_str, leader_change,
+                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
                 
                 # Parse the datetime string
                 try:

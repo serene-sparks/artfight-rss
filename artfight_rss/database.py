@@ -397,14 +397,28 @@ class ArtFightDatabase:
 
                 conn.execute("""
                     INSERT INTO team_standings
-                    (team1_percentage, fetched_at, leader_change, first_seen, last_updated)
-                    VALUES (?, ?, ?, ?, ?)
+                    (team1_percentage, fetched_at, leader_change, first_seen, last_updated,
+                     team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                     team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     standing.team1_percentage,
                     standing.fetched_at.isoformat(),
                     1 if standing.leader_change else 0,  # SQLite boolean as integer
                     now,  # first_seen
-                    now   # last_updated
+                    now,  # last_updated
+                    standing.team1_users,
+                    standing.team1_attacks,
+                    standing.team1_friendly_fire,
+                    standing.team1_battle_ratio,
+                    standing.team1_avg_points,
+                    standing.team1_avg_attacks,
+                    standing.team2_users,
+                    standing.team2_attacks,
+                    standing.team2_friendly_fire,
+                    standing.team2_battle_ratio,
+                    standing.team2_avg_points,
+                    standing.team2_avg_attacks
                 ))
             conn.commit()
 
@@ -427,7 +441,9 @@ class ArtFightDatabase:
         """Get the most recent team standings."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("""
-                SELECT team1_percentage, fetched_at, leader_change
+                SELECT team1_percentage, fetched_at, leader_change,
+                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
                 FROM team_standings
                 ORDER BY fetched_at DESC
                 LIMIT 1
@@ -435,7 +451,9 @@ class ArtFightDatabase:
             row = cursor.fetchone()
 
             if row:
-                (team1_percentage, fetched_at, leader_change) = row
+                (team1_percentage, fetched_at, leader_change,
+                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
 
                 # Parse datetime and ensure timezone awareness
                 fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
@@ -445,7 +463,19 @@ class ArtFightDatabase:
                     fetched_at=fetched_at_dt,
                     leader_change=bool(leader_change),
                     first_seen=fetched_at_dt,
-                    last_updated=fetched_at_dt
+                    last_updated=fetched_at_dt,
+                    team1_users=team1_users,
+                    team1_attacks=team1_attacks,
+                    team1_friendly_fire=team1_friendly_fire,
+                    team1_battle_ratio=team1_battle_ratio,
+                    team1_avg_points=team1_avg_points,
+                    team1_avg_attacks=team1_avg_attacks,
+                    team2_users=team2_users,
+                    team2_attacks=team2_attacks,
+                    team2_friendly_fire=team2_friendly_fire,
+                    team2_battle_ratio=team2_battle_ratio,
+                    team2_avg_points=team2_avg_points,
+                    team2_avg_attacks=team2_avg_attacks
                 )
                 return [standing]
 
@@ -458,7 +488,9 @@ class ArtFightDatabase:
 
         with sqlite3.connect(self.db_path) as conn:
             query = """
-                SELECT team1_percentage, fetched_at, leader_change
+                SELECT team1_percentage, fetched_at, leader_change,
+                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
                 FROM team_standings
                 ORDER BY fetched_at DESC
             """
@@ -471,7 +503,9 @@ class ArtFightDatabase:
 
             standings = []
             for row in rows:
-                (team1_percentage, fetched_at, leader_change) = row
+                (team1_percentage, fetched_at, leader_change,
+                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
 
                 # Parse datetime and ensure timezone awareness
                 fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
@@ -481,7 +515,19 @@ class ArtFightDatabase:
                     fetched_at=fetched_at_dt,
                     leader_change=bool(leader_change),
                     first_seen=fetched_at_dt,
-                    last_updated=fetched_at_dt
+                    last_updated=fetched_at_dt,
+                    team1_users=team1_users,
+                    team1_attacks=team1_attacks,
+                    team1_friendly_fire=team1_friendly_fire,
+                    team1_battle_ratio=team1_battle_ratio,
+                    team1_avg_points=team1_avg_points,
+                    team1_avg_attacks=team1_avg_attacks,
+                    team2_users=team2_users,
+                    team2_attacks=team2_attacks,
+                    team2_friendly_fire=team2_friendly_fire,
+                    team2_battle_ratio=team2_battle_ratio,
+                    team2_avg_points=team2_avg_points,
+                    team2_avg_attacks=team2_avg_attacks
                 )
                 standings.append(standing)
 
@@ -498,7 +544,9 @@ class ArtFightDatabase:
 
             # Get all standings from the last N days
             cursor = conn.execute("""
-                SELECT team1_percentage, fetched_at, leader_change
+                SELECT team1_percentage, fetched_at, leader_change,
+                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
                 FROM team_standings
                 WHERE fetched_at >= ?
                 ORDER BY fetched_at DESC
@@ -506,7 +554,9 @@ class ArtFightDatabase:
 
             all_standings = []
             for row in cursor.fetchall():
-                (team1_percentage, fetched_at, leader_change) = row
+                (team1_percentage, fetched_at, leader_change,
+                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
+                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
                 fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
 
                 standing = TeamStanding(
@@ -514,7 +564,19 @@ class ArtFightDatabase:
                     fetched_at=fetched_at_dt,
                     leader_change=bool(leader_change),
                     first_seen=fetched_at_dt,
-                    last_updated=fetched_at_dt
+                    last_updated=fetched_at_dt,
+                    team1_users=team1_users,
+                    team1_attacks=team1_attacks,
+                    team1_friendly_fire=team1_friendly_fire,
+                    team1_battle_ratio=team1_battle_ratio,
+                    team1_avg_points=team1_avg_points,
+                    team1_avg_attacks=team1_avg_attacks,
+                    team2_users=team2_users,
+                    team2_attacks=team2_attacks,
+                    team2_friendly_fire=team2_friendly_fire,
+                    team2_battle_ratio=team2_battle_ratio,
+                    team2_avg_points=team2_avg_points,
+                    team2_avg_attacks=team2_avg_attacks
                 )
                 all_standings.append(standing)
 

@@ -221,7 +221,6 @@ Once running, the service provides these endpoints:
 ### RSS Feeds
 - `GET /rss/{username}` - RSS feed for user attacks
 - `GET /rss/{username}/defenses` - RSS feed for user defenses
-- `GET /rss/teams` - RSS feed for current team standings
 - `GET /rss/standings` - RSS feed for team standing changes (daily updates + leader changes)
 
 ### Management
@@ -250,11 +249,7 @@ The service generates RSS feeds that can be consumed by Discord RSS bots:
    - Contains recent defenses by the specified user
    - Updates when new defenses are detected
 
-3. **Team Standings Feed**: `http://your-server:8000/rss/teams`
-   - Contains current team standings
-   - Updates when standings change
-
-4. **Team Changes Feed**: `http://your-server:8000/rss/standings`
+3. **Team Changes Feed**: `http://your-server:8000/rss/standings`
    - Contains team standing changes (daily updates and leader changes)
    - Special titles for leader changes: "Leader Change: Team Name takes the lead!"
 
@@ -268,9 +263,8 @@ The service generates RSS feeds that can be consumed by Discord RSS bots:
 2. **Add RSS Feeds:**
    ```
    User Attack Feed: http://your-server:8000/rss/username
-   User Defense Feed: http://your-server:8000/rss/username/defenses
-   Team Standings Feed: http://your-server:8000/rss/teams
-   Team Changes Feed: http://your-server:8000/rss/standings
+User Defense Feed: http://your-server:8000/rss/username/defenses
+Team Changes Feed: http://your-server:8000/rss/standings
    ```
 
 3. **Configure Channels:**

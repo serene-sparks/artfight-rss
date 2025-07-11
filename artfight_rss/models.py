@@ -109,13 +109,42 @@ class TeamStanding(SQLModel, table=True):
             team2_image = settings.teams.team2.image_url
 
         leader_image = team1_image if self.team1_percentage > 50 else team2_image
+        
+        # Build description with team metrics if available
+        description_parts = []
+        
         if self.leader_change:
             leader = team1_name if self.team1_percentage > 50 else team2_name
             title = f"Leader Change: {leader} takes the lead!"
-            description = f"{team1_name}: {self.team1_percentage:.5f}%, {team2_name}: {100-self.team1_percentage:.5f}%.\n\n![Image]({leader_image})"
+            description_parts.append(f"**{team1_name}**: {self.team1_percentage:.5f}%")
+            description_parts.append(f"**{team2_name}**: {100-self.team1_percentage:.5f}%")
         else:
             title = "Team Standings Update"
-            description = f"{team1_name}: {self.team1_percentage:.5f}%, {team2_name}: {100-self.team1_percentage:.5f}%.\n\n![Image]({leader_image})"
+            description_parts.append(f"**{team1_name}**: {self.team1_percentage:.5f}%")
+            description_parts.append(f"**{team2_name}**: {100-self.team1_percentage:.5f}%")
+        
+        # Add detailed metrics if available
+        if any([self.team1_users, self.team1_attacks, self.team1_friendly_fire, 
+                self.team2_users, self.team2_attacks, self.team2_friendly_fire]):
+            description_parts.append("")  # Empty line for spacing
+            description_parts.append("**Detailed Metrics:**")
+            
+            if self.team1_users and self.team2_users:
+                description_parts.append(f"**Users**: {team1_name}: {self.team1_users:,}, {team2_name}: {self.team2_users:,}")
+            if self.team1_attacks and self.team2_attacks:
+                description_parts.append(f"**Attacks**: {team1_name}: {self.team1_attacks:,}, {team2_name}: {self.team2_attacks:,}")
+            if self.team1_friendly_fire and self.team2_friendly_fire:
+                description_parts.append(f"**Friendly Fire**: {team1_name}: {self.team1_friendly_fire:,}, {team2_name}: {self.team2_friendly_fire:,}")
+            if self.team1_battle_ratio and self.team2_battle_ratio:
+                description_parts.append(f"**Battle Ratio**: {team1_name}: {self.team1_battle_ratio:.2f}%, {team2_name}: {self.team2_battle_ratio:.2f}%")
+            if self.team1_avg_points and self.team2_avg_points:
+                description_parts.append(f"**Avg Points**: {team1_name}: {self.team1_avg_points:.2f}, {team2_name}: {self.team2_avg_points:.2f}")
+            if self.team1_avg_attacks and self.team2_avg_attacks:
+                description_parts.append(f"**Avg Attacks**: {team1_name}: {self.team1_avg_attacks:.2f}, {team2_name}: {self.team2_avg_attacks:.2f}")
+        
+        description = "\n".join(description_parts)
+        if leader_image:
+            description += f"\n\n![Image]({leader_image})"
 
         return {
             "title": title,

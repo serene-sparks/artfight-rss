@@ -53,38 +53,21 @@ class AtomGenerator:
 
         # Add standings to feed
         for standing in standings:
-            team1_name = "Team 1"
-            team2_name = "Team 2"
-            team1_image = None
-            team2_image = None
-
-            # Get team names and images from config if available
-            if settings.teams:
-                team1_name = settings.teams.team1.name
-                team2_name = settings.teams.team2.name
-                team1_image = settings.teams.team1.image_url
-                team2_image = settings.teams.team2.image_url
-
-            leader_image = team1_image if standing.team1_percentage > 50 else team2_image
-
-            if standing.leader_change:
-                leader = team1_name if standing.team1_percentage > 50 else team2_name
-                title = f"Leader Change: {leader} takes the lead!"
-            else:
-                title = "Team Standings Update"
-
-            description = f"{team1_name}: {standing.team1_percentage:.4f}%, {team2_name}: {100-standing.team1_percentage:.4f}%."
-
+            # Use the enhanced to_atom_item method from the model
+            atom_item = standing.to_atom_item()
+            
             feed.add_item(
-                title=title,
-                description=description,
-                link=leader_image or feed_url,
-                published=standing.fetched_at,
-                entry_id=f"team-standings-{standing.fetched_at.strftime('%Y%m%d%H%M%S')}",
-                image_url=leader_image
+                title=atom_item["title"],
+                description=atom_item["description"],
+                link=atom_item["link"] or feed_url,
+                published=atom_item["published"],
+                entry_id=atom_item["entry_id"],
+                image_url=atom_item["image_url"]
             )
 
         return feed
+
+
 
     def generate_user_defense_feed(self, username: str, defenses: list[ArtFightDefense]) -> AtomFeed:
         """Generate Atom feed for a user's defenses."""

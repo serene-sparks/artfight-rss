@@ -162,6 +162,9 @@ async def get_stats():
     return monitor.get_stats()
 
 
+
+
+
 @app.get("/rss/standings")
 async def get_team_standings_changes_rss(limit: int = Query(None, description="Maximum number of items to return")):
     """Get RSS feed for team standing changes (daily updates and leader changes)."""
