@@ -12,6 +12,7 @@ from discord.ext import commands
 from .config import settings
 from .logging_config import get_logger
 from .models import ArtFightAttack, ArtFightDefense, TeamStanding
+from .plotting import generate_team_standings_plot
 
 logger = get_logger(__name__)
 
@@ -589,123 +590,7 @@ class ArtFightDiscordBot:
 
     async def _generate_team_standings_plot(self, team1_name: str, team2_name: str) -> discord.File | None:
         """Generate a team standings plot and return it as a Discord file."""
-        try:
-            # Import matplotlib here to avoid adding it as a main dependency
-            import sqlite3
-
-            import matplotlib.dates as mdates
-            import matplotlib.pyplot as plt
-
-            # Get database path
-            db_path = settings.db_path
-            if not db_path.exists():
-                logger.warning("Database file not found for plotting")
-                return None
-
-            # Fetch standings data
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT team1_percentage, fetched_at, leader_change,
-                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
-                FROM team_standings
-                ORDER BY fetched_at ASC
-            """)
-
-            data = cursor.fetchall()
-            conn.close()
-
-            if not data:
-                logger.warning("No team standings data found for plotting")
-                return None
-
-            # Parse the data
-            team1_percentages = []
-            fetched_times = []
-            leader_changes = []
-
-            for row in data:
-                (team1_percentage, fetched_at_str, leader_change,
-                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
-
-                # Parse the datetime string
-                try:
-                    fetched_at = datetime.fromisoformat(fetched_at_str)
-                except ValueError:
-                    # Try alternative format if needed
-                    fetched_at = datetime.strptime(fetched_at_str, "%Y-%m-%d %H:%M:%S")
-
-                team1_percentages.append(team1_percentage)
-                fetched_times.append(fetched_at)
-                leader_changes.append(bool(leader_change))
-
-            # Create the plot
-            fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-
-            # Plot team percentages over time
-            ax.plot(fetched_times, team1_percentages, 'b-', linewidth=2, label=f'{team1_name} %')
-
-            # Add a horizontal line at 50% to show the center
-            ax.axhline(y=50, color='gray', linestyle='--', alpha=0.7, label='Center (50%)')
-
-            # Highlight leader changes
-            leader_change_times = [fetched_times[i] for i in range(len(leader_changes)) if leader_changes[i]]
-            leader_change_percentages = [team1_percentages[i] for i in range(len(leader_changes)) if leader_changes[i]]
-
-            if leader_change_times:
-                ax.scatter(leader_change_times, leader_change_percentages,
-                           color='orange', s=100, zorder=5, label='Leader Change', marker='*')
-
-            # Format the plot
-            ax.set_ylabel('Percentage (%)', fontsize=12)
-            ax.set_xlabel('Time', fontsize=12)
-            ax.set_title(f'ArtFight Team Standings Over Time\n{team1_name} vs {team2_name}',
-                          fontsize=14, fontweight='bold')
-            ax.legend(loc='upper left')
-            ax.grid(True, alpha=0.3)
-
-            # Calculate y-axis limits based on largest distance from 50%
-            differences = [abs(p - 50) for p in team1_percentages]
-            max_distance = max(differences)
-
-            # Set min and max at 15% more than the largest distance from 50%
-            padding = max_distance * 0.15
-            y_min = max(0, 50 - max_distance - padding)
-            y_max = min(100, 50 + max_distance + padding)
-
-            ax.set_ylim(y_min, y_max)
-
-            # Format x-axis dates
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
-
-            # Adjust layout
-            plt.tight_layout()
-
-            # Save plot to bytes buffer
-            buffer = io.BytesIO()
-            fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
-            buffer.seek(0)
-
-            # Close the figure to free memory
-            plt.close(fig)
-
-            # Create Discord file
-            file = discord.File(buffer, filename="team_standings.png")
-
-            logger.info("Team standings plot generated successfully")
-            return file
-
-        except ImportError:
-            logger.warning("matplotlib not available for plotting")
-            return None
-        except Exception as e:
-            logger.error(f"Failed to generate team standings plot: {e}")
-            return None
+        return generate_team_standings_plot(team1_name, team2_name)
 
     def is_running(self) -> bool:
         """Check if the Discord bot is running."""
