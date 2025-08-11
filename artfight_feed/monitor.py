@@ -36,7 +36,11 @@ class ArtFightMonitor:
         self.team_task: asyncio.Task | None = None
         self.user_task: asyncio.Task | None = None
         self.news_task: asyncio.Task | None = None
-        self.running = False
+        
+        # Separate running flags for different monitoring types
+        self.running = False  # Main running flag (legacy, kept for compatibility)
+        self.news_running = False  # News monitoring loop
+        self.event_monitoring_running = False  # Team and user monitoring loops
 
         # Event handlers
         self.event_handlers: dict[str, list[Callable]] = {
@@ -52,7 +56,7 @@ class ArtFightMonitor:
             self.battle_over_detection_enabled = True
             logger.info("Battle over detection enabled - will stop team checks after 3 consecutive failures")
 
-    def _should_stop_team_monitoring(self) -> bool:
+    def _should_stop_event_monitoring(self) -> bool:
         """Check if team monitoring should be stopped due to consecutive battle over detections."""
         if not self.battle_over_detection_enabled:
             return False
@@ -71,8 +75,9 @@ class ArtFightMonitor:
         self.consecutive_battle_over_count += 1
         logger.info(f"Battle over detection #{self.consecutive_battle_over_count}/3")
         
-        if self._should_stop_team_monitoring():
-            self.running = False
+        if self._should_stop_event_monitoring():
+            self.event_monitoring_running = False
+            logger.info("Team/user monitoring stopped due to consecutive battle over detections")
 
     def _reset_battle_over_detection(self) -> None:
         """Reset the consecutive battle over detection counter when an event is found."""
@@ -122,6 +127,11 @@ class ArtFightMonitor:
             logger.info("ArtFight news monitor started")
         else:
             logger.info("ArtFight news monitor disabled")
+        
+        # Set the appropriate running flags
+        self.event_monitoring_running = True
+        if settings.monitor_news:
+            self.news_running = True
 
     async def stop(self) -> None:
         """Stop the monitoring service."""
@@ -130,6 +140,8 @@ class ArtFightMonitor:
 
         logger.info("Stopping ArtFight monitor...")
         self.running = False
+        self.news_running = False
+        self.event_monitoring_running = False
 
         # Cancel background tasks with timeout
         if self.team_task:
@@ -167,12 +179,98 @@ class ArtFightMonitor:
 
         logger.info("ArtFight monitor stopped")
 
+    async def start_news_monitoring(self) -> None:
+        """Start only the news monitoring service."""
+        if self.news_running:
+            logger.info("News monitoring is already running")
+            return
+
+        if not settings.monitor_news:
+            logger.warning("News monitoring is disabled in settings")
+            return
+
+        logger.info("Starting ArtFight news monitor...")
+        self.news_running = True
+        self.news_task = asyncio.create_task(self._news_monitor_loop())
+        logger.info("ArtFight news monitor started")
+
+    async def stop_news_monitoring(self) -> None:
+        """Stop only the news monitoring service."""
+        if not self.news_running:
+            logger.info("News monitoring is not running")
+            return
+
+        logger.info("Stopping ArtFight news monitor...")
+        self.news_running = False
+
+        if self.news_task:
+            self.news_task.cancel()
+            try:
+                await asyncio.wait_for(self.news_task, timeout=5.0)
+            except asyncio.CancelledError:
+                pass
+            except asyncio.TimeoutError:
+                logger.warning("News task did not stop within timeout")
+
+        logger.info("ArtFight news monitor stopped")
+
+    async def start_event_monitoring(self) -> None:
+        """Start only the event-dependent monitoring service (team and user)."""
+        if self.event_monitoring_running:
+            logger.info("Event monitoring is already running")
+            return
+
+        logger.info("Starting ArtFight event monitoring...")
+        self.event_monitoring_running = True
+
+        # Start background task for team monitoring
+        self.team_task = asyncio.create_task(self._team_monitor_loop())
+
+        # Start background task for user monitoring if users are configured
+        if settings.monitor_list:
+            self.user_task = asyncio.create_task(self._user_monitor_loop())
+            logger.info("ArtFight team and user monitor started")
+        else:
+            logger.info("ArtFight team monitor started (no users configured)")
+
+        logger.info("ArtFight event monitoring started")
+
+    async def stop_event_monitoring(self) -> None:
+        """Stop only the event-dependent monitoring service (team and user)."""
+        if not self.event_monitoring_running:
+            logger.info("Event monitoring is not running")
+            return
+
+        logger.info("Stopping ArtFight event monitoring...")
+        self.event_monitoring_running = False
+
+        # Cancel background tasks with timeout
+        if self.team_task:
+            self.team_task.cancel()
+            try:
+                await asyncio.wait_for(self.team_task, timeout=5.0)
+            except asyncio.CancelledError:
+                pass
+            except asyncio.TimeoutError:
+                logger.warning("Team task did not stop within timeout")
+
+        if self.user_task:
+            self.user_task.cancel()
+            try:
+                await asyncio.wait_for(self.user_task, timeout=5.0)
+            except asyncio.CancelledError:
+                pass
+            except asyncio.TimeoutError:
+                logger.warning("User task did not stop within timeout")
+
+        logger.info("ArtFight event monitoring stopped")
+
     async def _team_monitor_loop(self) -> None:
         """Background loop for monitoring team standings."""
-        while self.running:
+        while self.event_monitoring_running:
             try:
                 # Check if team monitoring should be stopped due to no event detection
-                if self._should_stop_team_monitoring():
+                if self._should_stop_event_monitoring():
                     logger.info("Team monitoring stopped due to no event detection")
                     break
                 
@@ -215,7 +313,7 @@ class ArtFightMonitor:
 
     async def _user_monitor_loop(self) -> None:
         """Background loop for monitoring user activity."""
-        while self.running:
+        while self.event_monitoring_running:
             try:
                 await self._fetch_user_activity()
                 # Use wait_for to make sleep cancellable
@@ -320,13 +418,15 @@ class ArtFightMonitor:
         """Get monitoring statistics."""
         return {
             "running": self.running,
+            "news_running": self.news_running,
+            "event_monitoring_running": self.event_monitoring_running,
             "last_team_update": self.last_team_update.isoformat() if self.last_team_update else None,
             "tracked_teams": len(self.last_team_sides),
             "cache_stats": self.cache.get_stats(),
             "no_event_detection": {
                 "enabled": self.battle_over_detection_enabled,
                 "consecutive_count": self.consecutive_battle_over_count,
-                "stopped": self._should_stop_team_monitoring()
+                "stopped": self._should_stop_event_monitoring()
             }
         }
 
@@ -340,15 +440,19 @@ class ArtFightMonitor:
             logger.info(f"Manually resetting battle over detection counter from {self.consecutive_battle_over_count}")
             self.consecutive_battle_over_count = 0
         
-        if not self.running and self._should_stop_team_monitoring():
-            logger.info("Restarting team monitoring after manual reset")
-            self.running = True
+        # Restart event monitoring if it's not currently running
+        if not self.event_monitoring_running:
+            logger.info("Restarting event monitoring after manual reset")
+            self.event_monitoring_running = True
             if not self.team_task or self.team_task.done():
                 self.team_task = asyncio.create_task(self._team_monitor_loop())
+            if not self.user_task or self.user_task.done():
+                if settings.monitor_list:
+                    self.user_task = asyncio.create_task(self._user_monitor_loop())
 
     async def _news_monitor_loop(self) -> None:
         """Background loop for monitoring news posts."""
-        while self.running:
+        while self.news_running:
             try:
                 await self._fetch_news_posts()
                 # Use wait_for to make sleep cancellable

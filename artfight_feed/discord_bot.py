@@ -43,6 +43,10 @@ class ArtFightDiscordBot:
         """Set the database instance for accessing rate limit data."""
         self.database = database
 
+    def set_monitor(self, monitor):
+        """Set the monitor instance for accessing monitoring status."""
+        self.monitor = monitor
+
     async def start(self):
         """Start the Discord bot or webhook."""
         if not settings.discord_enabled:
@@ -228,6 +232,27 @@ class ArtFightDiscordBot:
         embed.add_field(name="Status", value="🟢 Running", inline=True)
         embed.add_field(name="Mode", value="Bot" if self.bot else "Webhook", inline=True)
         embed.add_field(name="Notifications", value="Enabled", inline=True)
+
+        # Add monitor status if available
+        if hasattr(self, 'monitor') and self.monitor:
+            monitor_stats = self.monitor.get_stats()
+            
+            # Monitor status
+            overall_status = "🟢 Active" if monitor_stats.get("running", False) else "🔴 Inactive"
+            news_status = "🟢 Active" if monitor_stats.get("news_running", False) else "🔴 Inactive"
+            event_status = "🟢 Active" if monitor_stats.get("event_monitoring_running", False) else "🔴 Inactive"
+            
+            embed.add_field(name="Monitor Status", value=overall_status, inline=True)
+            embed.add_field(name="News Monitoring", value=news_status, inline=True)
+            embed.add_field(name="Event Monitoring", value=event_status, inline=True)
+            
+            # Battle over detection info
+            no_event_info = monitor_stats.get("no_event_detection", {})
+            if no_event_info.get("enabled", False):
+                consecutive_count = no_event_info.get("consecutive_count", 0)
+                stopped = no_event_info.get("stopped", False)
+                battle_status = f"🔴 Stopped ({consecutive_count}/3)" if stopped else f"🟢 Active ({consecutive_count}/3)"
+                embed.add_field(name="Battle Over Detection", value=battle_status, inline=True)
 
         await interaction.followup.send(embed=embed)
 
@@ -884,21 +909,34 @@ class ArtFightDiscordBot:
                     timestamp=datetime.now(UTC)
                 )
 
-                embed.add_field(
-                    name="Status",
-                    value="🟢 Active",
-                    inline=True
-                )
-                embed.add_field(
-                    name="Team Monitoring",
-                    value="🟢 Active",
-                    inline=True
-                )
-                embed.add_field(
-                    name="User Monitoring",
-                    value="🟢 Active",
-                    inline=True
-                )
+                # Get actual monitor status if available
+                if hasattr(self, 'monitor') and self.monitor:
+                    monitor_stats = self.monitor.get_stats()
+                    
+                    # Overall status
+                    overall_status = "🟢 Active" if monitor_stats.get("running", False) else "🔴 Inactive"
+                    embed.add_field(name="Overall Status", value=overall_status, inline=True)
+                    
+                    # News monitoring status
+                    news_status = "🟢 Active" if monitor_stats.get("news_running", False) else "🔴 Inactive"
+                    embed.add_field(name="News Monitoring", value=news_status, inline=True)
+                    
+                    # Event monitoring status (team/user)
+                    event_status = "🟢 Active" if monitor_stats.get("event_monitoring_running", False) else "🔴 Inactive"
+                    embed.add_field(name="Event Monitoring", value=event_status, inline=True)
+                    
+                    # Battle over detection info
+                    no_event_info = monitor_stats.get("no_event_detection", {})
+                    if no_event_info.get("enabled", False):
+                        consecutive_count = no_event_info.get("consecutive_count", 0)
+                        stopped = no_event_info.get("stopped", False)
+                        battle_status = f"🔴 Stopped ({consecutive_count}/3)" if stopped else f"🟢 Active ({consecutive_count}/3)"
+                        embed.add_field(name="Battle Over Detection", value=battle_status, inline=True)
+                else:
+                    # Fallback to hardcoded values if monitor not available
+                    embed.add_field(name="Status", value="🟢 Active", inline=True)
+                    embed.add_field(name="Team Monitoring", value="🟢 Active", inline=True)
+                    embed.add_field(name="User Monitoring", value="🟢 Active", inline=True)
 
                 embed.add_field(
                     name="Available Actions",

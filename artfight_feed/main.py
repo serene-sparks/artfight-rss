@@ -96,6 +96,8 @@ async def lifespan(app: FastAPI):
         logger.info("Starting Discord bot...")
         # Set the database instance on the Discord bot for rate limit access
         discord_bot.set_database(database)
+        # Set the monitor instance for status reporting
+        discord_bot.set_monitor(monitor)
         await discord_bot.start()
         logger.info("Discord bot started")
 
