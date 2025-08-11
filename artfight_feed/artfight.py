@@ -15,7 +15,7 @@ from .cache import RateLimiter
 from .config import settings
 from .database import ArtFightDatabase
 from .logging_config import get_logger
-from .models import ArtFightAttack, ArtFightDefense, TeamStanding
+from .models import ArtFightAttack, ArtFightDefense, TeamStanding, ArtFightNews
 
 # Set up logging
 logger = get_logger(__name__)
@@ -442,21 +442,23 @@ class ArtFightClient:
                 other_user = "Unknown"
 
             fetched_at = datetime.now(UTC)
+            now = datetime.now(UTC)
 
             if is_defense:
                 # For defenses: profile owner is defender, title contains attacker
                 defender = username
                 attacker = other_user
-
                 return ArtFightDefense(
                     id=element_id,
                     title=title,
                     description=description,
-                    image_url=image_url_http,
+                    image_url=str(image_url_http) if image_url_http else None,
                     defender_user=defender,
                     attacker_user=attacker,
                     fetched_at=fetched_at,
-                    url=url_http
+                    url=str(url_http),
+                    first_seen=now,
+                    last_updated=now
                 )
             else:
                 # For attacks: profile owner is attacker, title contains attacker
@@ -468,11 +470,13 @@ class ArtFightClient:
                     id=element_id,
                     title=title,
                     description=description,
-                    image_url=image_url_http,
+                    image_url=str(image_url_http) if image_url_http else None,
                     attacker_user=attacker,
                     defender_user=defender,
                     fetched_at=fetched_at,
-                    url=url_http
+                    url=str(url_http),
+                    first_seen=now,
+                    last_updated=now
                 )
 
         except Exception as e:
@@ -551,6 +555,11 @@ class ArtFightClient:
         """Parse team standings from HTML content."""
         soup = BeautifulSoup(html, "html.parser")
         standings = []
+
+        # Check if there's currently no event scheduled
+        if "no event scheduled" in html.lower():
+            logger.info("No ArtFight event currently scheduled, skipping team standings check")
+            return standings
 
         # Look for the progress bar that contains team standings
         progress_div = soup.find("div", class_="progress")
@@ -704,17 +713,17 @@ class ArtFightClient:
                     continue
                 
                 # Find the card header with team name
-                card_header = card_div.find("div", class_="card-header")
+                card_header = card_div.find("div", class_="card-header") # type: ignore
                 if not card_header:
                     continue
                 
                 # Extract team name from the link in the header
                 # Structure: <strong><a href="/team/21.fossils">Fossils</a></strong>
-                team_link = card_header.find("a")
+                team_link = card_header.find("a") # type: ignore
                 if not team_link:
                     continue
                 
-                team_name = team_link.get_text(strip=True)
+                team_name = team_link.get_text(strip=True) # type: ignore
                 if not team_name:
                     continue
                 
@@ -735,7 +744,7 @@ class ArtFightClient:
                 logger.debug(f"Processing metrics for {team_prefix}: {team_name}")
                 
                 # Find the card body with metrics
-                card_body = card_div.find("div", class_="card-body")
+                card_body = card_div.find("div", class_="card-body") # type: ignore
                 if not card_body:
                     continue
                 
@@ -881,8 +890,349 @@ class ArtFightClient:
             logger.error(f"Error parsing team1 percentage: {e}")
             return None
 
+    async def get_news_posts(self) -> list[ArtFightNews]:
+        """Fetch news posts from ArtFight."""
+        try:
+            # Rate limit the request
+            await self.rate_limiter.wait_if_needed("news")
+
+            # Fetch the news page
+            news_url = f"{self.base_url}/news/"
+            logger.debug(f"Fetching news from: {news_url}")
+
+            response = await self.client.get(news_url)
+            self._log_response(response)
+            response.raise_for_status()
+
+            # Parse news posts from HTML
+            news_posts = self._parse_news_from_html(response.text)
+            logger.info(f"Found {len(news_posts)} news posts")
+
+            return news_posts
+
+        except Exception as e:
+            logger.error(f"Error fetching news posts: {e}")
+            return []
+
+    def _parse_news_from_html(self, html: str) -> list[ArtFightNews]:
+        """Parse news posts from HTML content using robust relative element positioning."""
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+            news_posts = []
+
+            # Find news post cards using the card structure
+            news_cards = soup.find_all('div', class_='card mb-3')
+            
+            logger.debug(f"Found {len(news_cards)} news cards")
+
+            for card in news_cards:
+                try:
+                    news_post = self._parse_news_card_robust(card)
+                    if news_post:
+                        news_posts.append(news_post)
+                except Exception as e:
+                    logger.warning(f"Error parsing news card: {e}")
+                    continue
+
+            return news_posts
+
+        except Exception as e:
+            logger.error(f"Error parsing news HTML: {e}")
+            return []
+
+    def _parse_news_card_robust(self, card) -> ArtFightNews | None:
+        """Parse a single news post card using robust relative element positioning."""
+        try:
+            # Extract ID from the card structure
+            news_id = self._extract_news_id_from_card(card)
+            if not news_id:
+                logger.warning("Could not extract news ID from card")
+                return None
+
+            # Extract title from the card header
+            title = self._extract_title_from_card(card)
+            if not title:
+                logger.warning("Could not extract title from card")
+                return None
+
+            # Extract metadata from the card header
+            author, posted_at, edited_at, edited_by = self._extract_metadata_from_card(card)
+
+            # Extract content from the card body
+            content = self._extract_content_from_card(card)
+
+            # Construct URL
+            url = f"{self.base_url}/news/{news_id}"
+
+            # Create news post object
+            now = datetime.now(UTC)
+            news_post = ArtFightNews(
+                id=news_id,
+                title=title,
+                content=content,
+                author=author,
+                posted_at=posted_at,
+                edited_at=edited_at,
+                edited_by=edited_by,
+                url=url,
+                fetched_at=now,
+                first_seen=now,
+                last_updated=now
+            )
+
+            return news_post
+
+        except Exception as e:
+            logger.error(f"Error parsing news card: {e}")
+            return None
+
+    def _extract_news_id_from_card(self, card) -> int | None:
+        """Extract news ID from the card structure using multiple fallback methods."""
+        try:
+            # Method 1: Look for the title link in the card header
+            header = card.find('div', class_='card-header')
+            if header:
+                title_link = header.find('h2').find('a') if header.find('h2') else None
+                if title_link and title_link.get('href'):
+                    href = title_link.get('href')
+                    # Extract ID from URL like "/news/104.mid-fight-newspost" or "https://artfight.net/news/104.mid-fight-newspost"
+                    id_match = re.search(r'/news/(\d+)\.', href)
+                    if id_match:
+                        return int(id_match.group(1))
+
+            # Method 2: Look for any link with news URL pattern in the entire card
+            all_links = card.find_all('a', href=True)
+            for link in all_links:
+                href = link.get('href')
+                if '/news/' in href:
+                    id_match = re.search(r'/news/(\d+)\.', href)
+                    if id_match:
+                        return int(id_match.group(1))
+
+            logger.warning("Could not extract news ID using any method")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error extracting news ID: {e}")
+            return None
+
+    def _extract_title_from_card(self, card) -> str | None:
+        """Extract title from the card header using semantic structure."""
+        try:
+            # Look for the title in the card header
+            header = card.find('div', class_='card-header')
+            if header:
+                # Find the h2 element containing the title
+                title_elem = header.find('h2')
+                if title_elem:
+                    # Get the text from the link inside the h2
+                    title_link = title_elem.find('a')
+                    if title_link:
+                        return title_link.get_text(strip=True)
+                    # Fallback to h2 text if no link
+                    return title_elem.get_text(strip=True)
+
+            # Fallback: look for any h2 in the card
+            title_elem = card.find('h2')
+            if title_elem:
+                title_link = title_elem.find('a')
+                if title_link:
+                    return title_link.get_text(strip=True)
+                return title_elem.get_text(strip=True)
+
+            logger.warning("Could not extract title from card")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error extracting title: {e}")
+            return None
+
+    def _extract_metadata_from_card(self, card) -> tuple[str | None, datetime | None, datetime | None, str | None]:
+        """Extract metadata (author, posted_at, edited_at, edited_by) from the card header using HTML structure."""
+        try:
+            author = None
+            posted_at = None
+            edited_at = None
+            edited_by = None
+
+            # Look for metadata in the card header
+            header = card.find('div', class_='card-header')
+            if header:
+                # Find the h5 element containing metadata (subtitle)
+                metadata_elem = header.find('h5')
+                if metadata_elem:
+                    logger.debug(f"Found metadata element: {metadata_elem}")
+                    
+                    # Get the text content for debugging
+                    metadata_text = metadata_elem.get_text()
+                    logger.debug(f"Raw metadata text: {repr(metadata_text)}")
+                    
+                    # Extract author - look for the first <strong> tag which contains the author
+                    author_elem = metadata_elem.find('strong')
+                    if author_elem:
+                        # The author is in the <strong> tag, but we need to get just the text, not the link
+                        author_link = author_elem.find('a')
+                        if author_link:
+                            # Get the text content of the link, excluding any icon spans
+                            author_text = ''
+                            for content in author_link.contents:
+                                if hasattr(content, 'name') and content.name == 'span' and 'fas' in content.get('class', []):
+                                    continue  # Skip icon spans
+                                if hasattr(content, 'string') and content.string:
+                                    author_text += content.string
+                            author = author_text.strip()
+                            logger.debug(f"Found author from strong tag: {author}")
+                    
+                    # Extract posted date - look for text after "on" and before the edit info
+                    if ' on ' in metadata_text:
+                        on_index = metadata_text.find(' on ')
+                        date_start = on_index + len(' on ')
+                        
+                        # Find where the date ends (before edit info or end)
+                        date_end = metadata_text.find(' (', date_start)
+                        if date_end == -1:
+                            date_end = len(metadata_text)
+                        
+                        date_text = metadata_text[date_start:date_end].strip()
+                        logger.debug(f"Extracted date text: {repr(date_text)}")
+                        posted_at = self._parse_date(date_text)
+                    
+                    # Extract edit information - look for the timestamp span with title attribute
+                    # Note: Edit information is optional and only appears when posts have been edited
+                    timestamp_elem = metadata_elem.find('span', class_='timestamp')
+                    if timestamp_elem:
+                        # Get the absolute time from the title attribute
+                        absolute_time = timestamp_elem.get('title')
+                        if absolute_time:
+                            logger.debug(f"Found timestamp with title: {absolute_time}")
+                            edited_at = self._parse_date(absolute_time)
+                        
+                        # Get the editor name from the text before the timestamp
+                        # Look for the second <strong> tag which contains the editor
+                        strong_tags = metadata_elem.find_all('strong')
+                        if len(strong_tags) >= 2:
+                            editor_elem = strong_tags[1]  # Second strong tag
+                            editor_link = editor_elem.find('a')
+                            if editor_link:
+                                # Get the text content of the editor link, excluding any icon spans
+                                editor_text = ''
+                                for content in editor_link.contents:
+                                    if hasattr(content, 'name') and content.name == 'span' and 'fas' in content.get('class', []):
+                                        continue  # Skip icon spans
+                                    if hasattr(content, 'string') and content.string:
+                                        editor_text += content.string
+                                edited_by = editor_text.strip()
+                                logger.debug(f"Found editor from second strong tag: {edited_by}")
+                    else:
+                        # No edit information found - this is normal for unedited posts
+                        logger.debug("No edit information found - post appears to be unedited")
+                        edited_by = None
+                        edited_at = None
+                    
+                    # Remove the fallback text parsing since we're now handling the HTML structure properly
+                    # The fallback was only needed when we didn't understand the HTML structure
+
+            return author, posted_at, edited_at, edited_by
+
+        except Exception as e:
+            logger.warning(f"Error extracting metadata: {e}")
+            return None, None, None, None
+
+    def _parse_date(self, date_text: str) -> datetime | None:
+        """Parse a date string into a datetime object."""
+        try:
+            # Try different date formats
+            date_formats = [
+                "%d %B %Y %I:%M:%S %p",  # 12-hour format
+                "%d %B %Y %H:%M:%S",     # 24-hour format
+                "%d %B %Y %I:%M %p",     # 12-hour without seconds
+                "%d %B %Y %H:%M",        # 24-hour without seconds
+            ]
+            
+            for fmt in date_formats:
+                try:
+                    parsed_date = datetime.strptime(date_text, fmt)
+                    parsed_date = parsed_date.replace(tzinfo=UTC)
+                    logger.debug(f"Successfully parsed date '{date_text}' with format '{fmt}': {parsed_date}")
+                    return parsed_date
+                except ValueError:
+                    continue
+            
+            logger.debug(f"Could not parse date with any format: {date_text}")
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error parsing date '{date_text}': {e}")
+            return None
+
+    def _parse_edit_info(self, edit_text: str) -> tuple[str | None, datetime | None]:
+        """Parse edit information to extract editor and edit time."""
+        try:
+            edited_by = None
+            edited_at = None
+            
+            # Remove outer parentheses if present
+            if edit_text.startswith('(') and edit_text.endswith(')'):
+                edit_text = edit_text[1:-1]
+            
+            # Look for "Edited by [name] [time]"
+            if edit_text.startswith('Edited by'):
+                # Extract editor name
+                edited_by_start = len('Edited by')
+                edited_by_end = edit_text.find(' ', edited_by_start)
+                if edited_by_end != -1:
+                    edited_by = edit_text[edited_by_start:edited_by_end].strip()
+                    
+                    # Extract edit time
+                    time_start = edited_by_end + 1
+                    edit_time_text = edit_text[time_start:].strip()
+                    
+                    logger.debug(f"Extracted editor: {edited_by}, edit time: {edit_time_text}")
+                    
+                    # Check if it's relative time
+                    if 'ago' in edit_time_text.lower():
+                        edited_at = None  # TODO: Implement relative time parsing
+                        logger.debug(f"Edit time is relative: {edit_time_text}")
+                    else:
+                        # Try to parse as absolute time
+                        edited_at = self._parse_date(edit_time_text)
+            
+            return edited_by, edited_at
+            
+        except Exception as e:
+            logger.debug(f"Error parsing edit info '{edit_text}': {e}")
+            return None, None
+
+    def _extract_content_from_card(self, card) -> str | None:
+        """Extract content from the card body using semantic structure."""
+        try:
+            # Look for the card body
+            body = card.find('div', class_='card-body')
+            if body:
+                # Get all text content, excluding script and style elements
+                for script in body(["script", "style"]):
+                    script.decompose()
+                
+                # Get the text content and clean it up
+                content = body.get_text(separator=' ', strip=True)
+                
+                # Clean up excessive whitespace
+                content = re.sub(r'\s+', ' ', content)
+                content = content.strip()
+                
+                # Store the full content (no truncation)
+                return content
+
+            logger.warning("Could not find card body")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error extracting content: {e}")
+            return None
+
     async def close(self) -> None:
         """Close the HTTP client."""
         logger.debug("Closing ArtFight client")
-        await self.client.aclose()
+        if self.client:
+            await self.client.aclose()
         logger.debug("ArtFight client closed")

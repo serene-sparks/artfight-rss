@@ -45,7 +45,7 @@ python scripts/generate_team_plot.py --verbose
 ### Programmatic Usage
 
 ```python
-from artfight_rss.plotting import generate_team_standings_plot, save_team_standings_plot
+from artfight_feed.plotting import generate_team_standings_plot, save_team_standings_plot
 
 # Generate Discord file
 discord_file = generate_team_standings_plot("Team 1", "Team 2")

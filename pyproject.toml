@@ -1,9 +1,9 @@
 [project]
-name = "artfight-rss"
+name = "artfight-feed"
 version = "0.1.0"
-description = "RSS service for monitoring ArtFight profiles and team standings"
+description = "Atom service for monitoring ArtFight profiles, team standings, and news"
 authors = [
-    {name = "ArtFight RSS Service", email = "admin@example.com"}
+    {name = "ArtFight Feed Service", email = "admin@example.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,6 +28,9 @@ dependencies = [
     "alembic>=1.16.3",
     "sqlalchemy>=2.0.41",
     "sqlmodel>=0.0.24",
+    "matplotlib>=3.10.3",
+    "redlines>=0.5.2",
+    "html2text>=2025.4.15",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +49,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["artfight_rss"]
+packages = ["artfight_feed"]
 
 [tool.black]
 line-length = 88

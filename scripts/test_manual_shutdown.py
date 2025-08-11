@@ -20,7 +20,7 @@ def test_manual_shutdown():
     try:
         # Run the server
         process = subprocess.Popen([
-            sys.executable, "-m", "artfight_rss.main"
+            sys.executable, "-m", "artfight_feed.main"
         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
         print(f"Server started with PID: {process.pid}")

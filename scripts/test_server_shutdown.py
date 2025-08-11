@@ -7,10 +7,10 @@ import sys
 import time
 from pathlib import Path
 
-# Add the artfight_rss directory to the path
-sys.path.insert(0, str(Path(__file__).parent.parent / "artfight_rss"))
+# Add the artfight_feed directory to the path
+sys.path.insert(0, str(Path(__file__).parent.parent / "artfight_feed"))
 
-from artfight_rss.logging_config import setup_logging, get_logger
+from artfight_feed.logging_config import setup_logging, get_logger
 
 
 async def test_server():

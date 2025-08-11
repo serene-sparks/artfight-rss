@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from pydantic import HttpUrl
 
-from artfight_rss.models import ArtFightAttack, TeamStanding
+from artfight_feed.models import ArtFightAttack, TeamStanding
 
 
 def test_artfight_attack_creation():

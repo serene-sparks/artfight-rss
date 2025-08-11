@@ -55,14 +55,14 @@ def setup_logging() -> None:
             "file": {
                 "class": "logging.handlers.RotatingFileHandler",
                 "formatter": "detailed",
-                "filename": logs_dir / "artfight-rss.log",
+                "filename": logs_dir / "artfight-feed.log",
                 "maxBytes": 10 * 1024 * 1024,  # 10MB
                 "backupCount": 5,
             },
             "error_file": {
                 "class": "logging.handlers.RotatingFileHandler",
                 "formatter": "detailed",
-                "filename": logs_dir / "artfight-rss-error.log",
+                "filename": logs_dir / "artfight-feed-error.log",
                 "maxBytes": 10 * 1024 * 1024,  # 10MB
                 "backupCount": 5,
                 "level": "ERROR",
@@ -76,42 +76,42 @@ def setup_logging() -> None:
                 "propagate": False,
             },
             # Application loggers
-            "artfight_rss": {
+            "artfight_feed": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
             },
-            "artfight_rss.artfight": {
+            "artfight_feed.artfight": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
             },
-            "artfight_rss.database": {
+            "artfight_feed.database": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
             },
-            "artfight_rss.cache": {
+            "artfight_feed.cache": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
             },
-            "artfight_rss.monitor": {
+            "artfight_feed.monitor": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
             },
-            "artfight_rss.rss": {
+            "artfight_feed.rss": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
             },
-            "artfight_rss.discord_bot": {
+            "artfight_feed.discord_bot": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
             },
-            "artfight_rss.config": {
+            "artfight_feed.config": {
                 "handlers": ["console", "file", "error_file"],
                 "level": artfight_level,
                 "propagate": False,
@@ -183,9 +183,9 @@ def setup_logging() -> None:
     logging.config.dictConfig(logging_config)
 
     # Log the configuration
-    logger = logging.getLogger("artfight_rss")
+    logger = logging.getLogger("artfight_feed")
     logger.info(f"Logging configured - Debug mode: {settings.debug}")
-    logger.info(f"Log files: {logs_dir}/artfight-rss.log, {logs_dir}/artfight-rss-error.log")
+    logger.info(f"Log files: {logs_dir}/artfight-feed.log, {logs_dir}/artfight-feed-error.log")
 
 
 def get_logger(name: str) -> logging.Logger:

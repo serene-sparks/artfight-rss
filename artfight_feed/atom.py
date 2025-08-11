@@ -1,14 +1,12 @@
-"""Atom feed generation for Discord RSS bots."""
+"""Atom feed generation"""
 
 from urllib.parse import urljoin
 
 from .config import settings
-from .models import ArtFightAttack, ArtFightDefense, AtomFeed, TeamStanding
+from .models import ArtFightAttack, ArtFightDefense, AtomFeed, TeamStanding, ArtFightNews
 
 
 class AtomGenerator:
-    """Generate Atom feeds for Discord RSS bots."""
-
     def __init__(self) -> None:
         """Initialize Atom generator."""
         self.base_url = f"http://{settings.host}:{settings.port}"
@@ -67,7 +65,34 @@ class AtomGenerator:
 
         return feed
 
+    def generate_news_feed(self, news_posts: list[ArtFightNews]) -> AtomFeed:
+        """Generate Atom feed for ArtFight news posts."""
+        feed_url = urljoin(self.base_url, "/rss/news")
+        feed_id = "artfight-news"
 
+        feed = AtomFeed(
+            title="ArtFight News",
+            description="Latest news posts from ArtFight",
+            link=feed_url,
+            feed_id=feed_id
+        )
+
+        # Add news posts to feed
+        for news in news_posts:
+            # Use the enhanced to_atom_item method from the model
+            atom_item = news.to_atom_item()
+            
+            feed.add_item(
+                title=atom_item["title"],
+                description=atom_item["description"],
+                link=atom_item["link"],
+                published=atom_item["published"],
+                entry_id=atom_item["entry_id"],
+                author=atom_item["author"],
+                image_url=atom_item["image_url"]
+            )
+
+        return feed
 
     def generate_user_defense_feed(self, username: str, defenses: list[ArtFightDefense]) -> AtomFeed:
         """Generate Atom feed for a user's defenses."""
@@ -222,4 +247,4 @@ class AtomGenerator:
 
 
 # Global Atom generator instance
-rss_generator = AtomGenerator()
+atom_generator = AtomGenerator()

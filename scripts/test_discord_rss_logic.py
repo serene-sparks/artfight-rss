@@ -10,10 +10,10 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from artfight_rss.config import settings
-from artfight_rss.database import ArtFightDatabase
-from artfight_rss.models import TeamStanding
-from artfight_rss.rss import AtomGenerator
+from artfight_feed.config import settings
+from artfight_feed.database import ArtFightDatabase
+from artfight_feed.models import TeamStanding
+from artfight_feed.atom import AtomGenerator
 
 
 async def test_discord_rss_logic():

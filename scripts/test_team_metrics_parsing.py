@@ -5,11 +5,11 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from artfight_rss.artfight import ArtFightClient
-from artfight_rss.database import ArtFightDatabase
-from artfight_rss.cache import SQLiteCache
-from artfight_rss.config import settings
-from artfight_rss.cache import RateLimiter
+from artfight_feed.artfight import ArtFightClient
+from artfight_feed.database import ArtFightDatabase
+from artfight_feed.cache import SQLiteCache
+from artfight_feed.config import settings
+from artfight_feed.cache import RateLimiter
 
 # Sample HTML from the events page
 SAMPLE_HTML = """
@@ -83,7 +83,7 @@ async def test_team_metrics_parsing():
         print("\n🔍 Testing TeamStanding creation:")
         print("-" * 40)
 
-        from artfight_rss.models import TeamStanding
+        from artfight_feed.models import TeamStanding
         from datetime import datetime, UTC
 
         standing = TeamStanding(

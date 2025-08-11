@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import settings
-from .models import ArtFightAttack, ArtFightDefense, TeamStanding, CacheEntry
+from .models import ArtFightAttack, ArtFightDefense, TeamStanding, CacheEntry, ArtFightNews, NewsRevision
 
 
 def ensure_timezone_aware(dt: datetime) -> datetime:
@@ -39,79 +39,46 @@ class ArtFightDatabase:
         self.db_path.parent.mkdir(exist_ok=True)
         self._init_database()
 
+    def migrate(self) -> None:
+        """Run Alembic migrations for this database."""
+        import subprocess
+        import sys
+        import os
+        
+        try:
+            # Get the project root directory (where alembic.ini is located)
+            # For test databases, use the current working directory as it should be the project root
+            import os
+            project_root = Path(os.getcwd())
+            
+            # Verify alembic.ini exists
+            if not (project_root / "alembic.ini").exists():
+                raise RuntimeError(f"Could not find alembic.ini in {project_root}")
+            
+            # Set the database URL environment variable for Alembic
+            db_url = f"sqlite:///{self.db_path}"
+            env = {**os.environ, "DATABASE_URL": db_url}
+            
+            # Run alembic upgrade head with explicit config file
+            result = subprocess.run(
+                [sys.executable, "-m", "alembic", "-c", str(project_root / "alembic.ini"), "upgrade", "head"],
+                capture_output=True,
+                text=True,
+                cwd=project_root,
+                env=env
+            )
+            
+            if result.returncode != 0:
+                raise RuntimeError(f"Migration failed: {result.stderr}\nstdout: {result.stdout}")
+                
+        except Exception as e:
+            raise RuntimeError(f"Failed to run migrations: {e}")
+
     def _init_database(self) -> None:
-        """Initialize the SQLite database and tables."""
-        with sqlite3.connect(self.db_path) as conn:
-            # Create attacks table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS attacks (
-                    id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    description TEXT,
-                    image_url TEXT,
-                    attacker_user TEXT NOT NULL,
-                    defender_user TEXT NOT NULL,
-                    fetched_at TEXT NOT NULL,
-                    url TEXT NOT NULL,
-                    first_seen TEXT NOT NULL,
-                    last_updated TEXT NOT NULL
-                )
-            """)
-
-            # Create defenses table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS defenses (
-                    id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    description TEXT,
-                    image_url TEXT,
-                    defender_user TEXT NOT NULL,
-                    attacker_user TEXT NOT NULL,
-                    fetched_at TEXT NOT NULL,
-                    url TEXT NOT NULL,
-                    first_seen TEXT NOT NULL,
-                    last_updated TEXT NOT NULL
-                )
-            """)
-
-            # Create rate limiting table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS rate_limits (
-                    key TEXT PRIMARY KEY,
-                    last_request TEXT NOT NULL,
-                    min_interval INTEGER NOT NULL
-                )
-            """)
-
-            # Create team standings table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS team_standings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    team1_percentage REAL NOT NULL,
-                    fetched_at TEXT NOT NULL,
-                    leader_change INTEGER NOT NULL DEFAULT 0,
-                    first_seen TEXT NOT NULL,
-                    last_updated TEXT NOT NULL
-                )
-            """)
-
-            # Create cache entries table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS cache_entries (
-                    key TEXT PRIMARY KEY,
-                    data TEXT NOT NULL,
-                    timestamp TEXT NOT NULL,
-                    ttl INTEGER NOT NULL
-                )
-            """)
-
-            # Create indexes for better performance
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_attacks_attacker_user ON attacks(attacker_user)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_attacks_fetched_at ON attacks(fetched_at)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_defenses_attacker_user ON defenses(attacker_user)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_defenses_fetched_at ON defenses(fetched_at)")
-
-            conn.commit()
+        """Initialize the SQLite database connection."""
+        # Ensure the database directory exists
+        self.db_path.parent.mkdir(exist_ok=True)
+        
 
     def save_attacks(self, attacks: list[ArtFightAttack]) -> None:
         """Save attacks to database, updating existing ones."""
@@ -182,7 +149,7 @@ class ArtFightDatabase:
             placeholders = ','.join(['?' for _ in usernames])
             query = f"""
                 SELECT id, title, description, image_url, attacker_user, defender_user,
-                       fetched_at, url
+                       fetched_at, url, first_seen, last_updated
                 FROM attacks
                 WHERE attacker_user IN ({placeholders})
                 ORDER BY fetched_at DESC
@@ -197,25 +164,24 @@ class ArtFightDatabase:
             attacks = []
             for row in rows:
                 (id_, title, description, image_url, attacker_user, defender_user,
-                 fetched_at, url) = row
+                 fetched_at, url, first_seen, last_updated) = row
 
                 # Parse datetime and ensure timezone awareness
                 fetched_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
-
-                # Convert URLs back to HttpUrl objects
-                from pydantic import HttpUrl, parse_obj_as
-                image_url_http = parse_obj_as(HttpUrl, image_url) if image_url else None
-                url_http = parse_obj_as(HttpUrl, url)
+                first_seen_dt = ensure_timezone_aware(datetime.fromisoformat(first_seen))
+                last_updated_dt = ensure_timezone_aware(datetime.fromisoformat(last_updated))
 
                 attack = ArtFightAttack(
                     id=id_,
                     title=title,
                     description=description,
-                    image_url=image_url_http,
+                    image_url=image_url,
                     attacker_user=attacker_user,
                     defender_user=defender_user,
                     fetched_at=fetched_dt,
-                    url=url_http
+                    url=url,
+                    first_seen=first_seen_dt,
+                    last_updated=last_updated_dt
                 )
                 attacks.append(attack)
 
@@ -234,7 +200,7 @@ class ArtFightDatabase:
             placeholders = ','.join(['?' for _ in usernames])
             query = f"""
                 SELECT id, title, description, image_url, defender_user, attacker_user,
-                       fetched_at, url
+                       fetched_at, url, first_seen, last_updated
                 FROM defenses
                 WHERE defender_user IN ({placeholders})
                 ORDER BY fetched_at DESC
@@ -249,25 +215,24 @@ class ArtFightDatabase:
             defenses = []
             for row in rows:
                 (id_, title, description, image_url, defender_user, attacker_user,
-                 fetched_at, url) = row
+                 fetched_at, url, first_seen, last_updated) = row
 
                 # Parse datetime and ensure timezone awareness
                 fetched_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
-
-                # Convert URLs back to HttpUrl objects
-                from pydantic import HttpUrl, parse_obj_as
-                image_url_http = parse_obj_as(HttpUrl, image_url) if image_url else None
-                url_http = parse_obj_as(HttpUrl, url)
+                first_seen_dt = ensure_timezone_aware(datetime.fromisoformat(first_seen))
+                last_updated_dt = ensure_timezone_aware(datetime.fromisoformat(last_updated))
 
                 defense = ArtFightDefense(
                     id=id_,
                     title=title,
                     description=description,
-                    image_url=image_url_http,
+                    image_url=image_url,
                     defender_user=defender_user,
                     attacker_user=attacker_user,
                     fetched_at=fetched_dt,
-                    url=url_http
+                    url=url,
+                    first_seen=first_seen_dt,
+                    last_updated=last_updated_dt
                 )
                 defenses.append(defense)
 
@@ -290,6 +255,251 @@ class ArtFightDatabase:
                 (username,)
             )
             return {row[0] for row in cursor.fetchall()}
+
+    def get_existing_news_ids(self) -> set[int]:
+        """Get set of existing news post IDs."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT id FROM news")
+            return {row[0] for row in cursor.fetchall()}
+
+    def get_existing_news_by_id(self, news_id: int) -> ArtFightNews | None:
+        """Get an existing news post by ID."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("""
+                SELECT id, title, content, author, posted_at, edited_at, edited_by,
+                       url, fetched_at, first_seen, last_updated
+                FROM news WHERE id = ?
+            """, (news_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return None
+                
+            (id_, title, content, author, posted_at, edited_at, edited_by,
+             url, fetched_at, first_seen, last_updated) = row
+
+            # Parse datetime and ensure timezone awareness
+            fetched_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
+            first_seen_dt = ensure_timezone_aware(datetime.fromisoformat(first_seen))
+            last_updated_dt = ensure_timezone_aware(datetime.fromisoformat(last_updated))
+            
+            # Parse optional datetime fields
+            posted_dt = None
+            if posted_at:
+                posted_dt = ensure_timezone_aware(datetime.fromisoformat(posted_at))
+            
+            edited_dt = None
+            if edited_at:
+                edited_dt = ensure_timezone_aware(datetime.fromisoformat(edited_at))
+
+            return ArtFightNews(
+                id=id_,
+                title=title,
+                content=content,
+                author=author,
+                posted_at=posted_dt,
+                edited_at=edited_dt,
+                edited_by=edited_by,
+                url=url,
+                fetched_at=fetched_dt,
+                first_seen=first_seen_dt,
+                last_updated=last_updated_dt
+            )
+
+    def get_next_revision_number(self, news_id: int) -> int:
+        """Get the next revision number for a news post."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("""
+                SELECT MAX(revision_number) FROM news_revisions WHERE news_id = ?
+            """, (news_id,))
+            
+            result = cursor.fetchone()
+            if result[0] is None:
+                return 1
+            return result[0] + 1
+
+    def save_news_revision(self, revision: 'NewsRevision') -> None:
+        """Save a news revision to the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT INTO news_revisions
+                (news_id, revision_number, title, content, author, posted_at, edited_at, edited_by,
+                 url, fetched_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                revision.news_id,
+                revision.revision_number,
+                revision.title,
+                revision.content,
+                revision.author,
+                revision.posted_at.isoformat() if revision.posted_at else None,
+                revision.edited_at.isoformat() if revision.edited_at else None,
+                revision.edited_by,
+                revision.url,
+                revision.fetched_at.isoformat(),
+                revision.created_at.isoformat()
+            ))
+            conn.commit()
+
+    def save_news(self, news_posts: list[ArtFightNews]) -> list[tuple[ArtFightNews, ArtFightNews | None]]:
+        """Save news posts to database, updating existing ones and creating revisions for changes.
+        
+        Returns a list of tuples: (current_post, old_post_if_revised)
+        """
+        if not news_posts:
+            return []
+
+        now = datetime.now(UTC)
+        results = []
+
+        with sqlite3.connect(self.db_path) as conn:
+            for news in news_posts:
+                # Check if this news post already exists
+                existing_news = self.get_existing_news_by_id(news.id)
+                
+                # Check if this is a revision of an existing news post
+                if existing_news:
+                    # Convert HTML to markdown for content comparison
+                    import html2text
+                    h = html2text.HTML2Text()
+                    h.ignore_links = False
+                    h.ignore_images = False
+                    h.body_width = 0
+                    
+                    old_markdown = h.handle(existing_news.content).strip() if existing_news.content else ""
+                    new_markdown = h.handle(news.content).strip() if news.content else ""
+                    
+                    # Check for any changes (including metadata changes)
+                    title_changed = existing_news.title != news.title
+                    content_changed = old_markdown != new_markdown
+                    editor_changed = existing_news.edited_by != news.edited_by
+                    edit_date_changed = existing_news.edited_at != news.edited_at
+                    
+                    # Create revision for ANY changes (title, content, editor, or edit date)
+                    if title_changed or content_changed or editor_changed or edit_date_changed:
+                        # Create revision record for the old post
+                        revision = NewsRevision(
+                            news_id=existing_news.id,
+                            revision_number=self.get_next_revision_number(existing_news.id),
+                            title=existing_news.title,
+                            content=existing_news.content,
+                            author=existing_news.author,
+                            posted_at=existing_news.posted_at,
+                            edited_at=existing_news.edited_at,
+                            edited_by=existing_news.edited_by,
+                            url=existing_news.url,
+                            fetched_at=existing_news.fetched_at,
+                            created_at=now
+                        )
+                        self.save_news_revision(revision)
+                        
+                        # Update the existing news post
+                        conn.execute("""
+                            UPDATE news SET
+                                title = ?, content = ?, edited_at = ?, edited_by = ?,
+                                fetched_at = ?, last_updated = ?
+                            WHERE id = ?
+                        """, (
+                            news.title,
+                            news.content,
+                            news.edited_at.isoformat() if news.edited_at else None,
+                            news.edited_by,
+                            news.fetched_at.isoformat(),
+                            now.isoformat(),
+                            news.id
+                        ))
+                        results.append((news, existing_news))
+                    else:
+                        # No changes at all, just update fetch time
+                        conn.execute("""
+                            UPDATE news SET fetched_at = ?, last_updated = ?
+                            WHERE id = ?
+                        """, (news.fetched_at.isoformat(), now.isoformat(), news.id))
+                        results.append((news, None))
+                else:
+                    # New news post
+                    conn.execute("""
+                        INSERT INTO news
+                    (id, title, content, author, posted_at, edited_at, edited_by,
+                     url, fetched_at, first_seen, last_updated)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    news.id,
+                    news.title,
+                    news.content,
+                    news.author,
+                    news.posted_at.isoformat() if news.posted_at else None,
+                    news.edited_at.isoformat() if news.edited_at else None,
+                    news.edited_by,
+                    news.url,
+                    news.fetched_at.isoformat(),
+                        now.isoformat(),  # first_seen
+                        now.isoformat()   # last_updated
+                ))
+                    results.append((news, None))
+            
+            conn.commit()
+        
+        return results
+
+    def get_news(self, limit: int | None = None) -> list[ArtFightNews]:
+        """Get news posts, ordered by ID (newest first) for correct alerting."""
+        # TODO: This is not correct, we need to order by posted_at or fetched_at
+        # but we need to make sure we get the correct news post order.
+        # Good enough unless something shows otherwise
+        
+        # Validate and apply limit
+        validated_limit = validate_and_apply_limit(limit)
+
+        with sqlite3.connect(self.db_path) as conn:
+            query = """
+                SELECT id, title, content, author, posted_at, edited_at, edited_by,
+                       url, fetched_at, first_seen, last_updated
+                FROM news
+                ORDER BY id DESC
+            """
+
+            if validated_limit:
+                query += f" LIMIT {validated_limit}"
+
+            cursor = conn.execute(query)
+            rows = cursor.fetchall()
+
+            news_posts = []
+            for row in rows:
+                (id_, title, content, author, posted_at, edited_at, edited_by,
+                 url, fetched_at, first_seen, last_updated) = row
+
+                # Parse datetime and ensure timezone awareness
+                fetched_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
+                first_seen_dt = ensure_timezone_aware(datetime.fromisoformat(first_seen))
+                last_updated_dt = ensure_timezone_aware(datetime.fromisoformat(last_updated))
+                
+                # Parse optional datetime fields
+                posted_dt = None
+                if posted_at:
+                    posted_dt = ensure_timezone_aware(datetime.fromisoformat(posted_at))
+                
+                edited_dt = None
+                if edited_at:
+                    edited_dt = ensure_timezone_aware(datetime.fromisoformat(edited_at))
+
+                news = ArtFightNews(
+                    id=id_,
+                    title=title,
+                    content=content,
+                    author=author,
+                    posted_at=posted_dt,
+                    edited_at=edited_dt,
+                    edited_by=edited_by,
+                    url=url,
+                    fetched_at=fetched_dt,
+                    first_seen=first_seen_dt,
+                    last_updated=last_updated_dt
+                )
+                news_posts.append(news)
+
+            return news_posts
 
     def get_rate_limit(self, key: str) -> datetime | None:
         """Get last request time for rate limiting."""
@@ -321,6 +531,7 @@ class ArtFightDatabase:
             defense_count = conn.execute("SELECT COUNT(*) FROM defenses").fetchone()[0]
             rate_limit_count = conn.execute("SELECT COUNT(*) FROM rate_limits").fetchone()[0]
             team_count = conn.execute("SELECT COUNT(*) FROM team_standings").fetchone()[0]
+            news_count = conn.execute("SELECT COUNT(*) FROM news").fetchone()[0]
 
             # Get team standings statistics
             team_stats = {}
@@ -356,6 +567,7 @@ class ArtFightDatabase:
                 "total_defenses": defense_count,
                 "total_rate_limits": rate_limit_count,
                 "total_team_standings": team_count,
+                "total_news": news_count,
                 "team_standings_stats": team_stats,
                 "database_path": str(self.db_path),
                 "database_size_bytes": db_size,

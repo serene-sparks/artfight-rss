@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Setup script for creating and enabling a systemd service for ArtFight RSS Service."""
+"""Setup script for creating and enabling a systemd service for ArtFight Feed Service."""
 
 import os
 import subprocess
@@ -66,6 +66,57 @@ def read_config_value(config_file: Path, key: str, default: str) -> str:
     except Exception:
         return default
 
+def cleanup_old_service():
+    """Clean up old artfight-rss service if it exists and preserve files by moving them."""
+    old_service_name = "artfight-rss"
+    new_service_name = "artfight-feed"
+    
+    print(f"🧹 Checking for old {old_service_name} service...")
+    
+    # Check if old service exists and is running
+    try:
+        result = subprocess.run(["systemctl", "is-active", old_service_name], 
+                              capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            print(f"⚠️  Old {old_service_name} service is running. Stopping it...")
+            run_command(["systemctl", "stop", old_service_name])
+        
+        # Disable old service
+        result = subprocess.run(["systemctl", "is-enabled", old_service_name], 
+                              capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            print(f"⚠️  Disabling old {old_service_name} service...")
+            run_command(["systemctl", "disable", old_service_name])
+    except Exception as e:
+        print(f"⚠️  Warning: Could not check old service status: {e}")
+    
+    # Move old service file to backup location instead of deleting
+    old_service_file = Path(f"/etc/systemd/system/{old_service_name}.service")
+    if old_service_file.exists():
+        # Create backup directory
+        backup_dir = Path("/etc/systemd/system/backup")
+        backup_dir.mkdir(exist_ok=True)
+        
+        # Create timestamped backup filename
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"{old_service_name}.service.{timestamp}.backup"
+        backup_path = backup_dir / backup_filename
+        
+        print(f"📦 Moving old service file to backup: {backup_path}")
+        try:
+            # Move the file to backup location
+            old_service_file.rename(backup_path)
+            print(f"✅ Old service file preserved at: {backup_path}")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not move old service file: {e}")
+            print(f"   Old service file remains at: {old_service_file}")
+    
+    # Reload systemd daemon to recognize changes
+    run_command(["systemctl", "daemon-reload"])
+    print(f"✅ Cleanup of old {old_service_name} service completed")
+    print(f"   Old service files have been preserved in /etc/systemd/system/backup/")
+
 def create_venv(project_root: Path, user: str, group: str):
     """Create a Python virtual environment."""
     venv_path = project_root / "venv"
@@ -103,7 +154,7 @@ def install_dependencies(pip_path: Path, project_root: Path, user: str, group: s
 def create_systemd_service(project_root: Path, user: str, group: str, host: str, port: int, python_path: Path):
     """Create the systemd service file."""
     service_content = f"""[Unit]
-Description=ArtFight RSS Service
+Description=ArtFight Feed Service
 After=network.target
 Wants=network.target
 
@@ -113,12 +164,12 @@ User={user}
 Group={group}
 WorkingDirectory={project_root}
 Environment=PYTHONPATH={project_root}
-ExecStart={python_path} -m uvicorn artfight_rss.main:app --host {host} --port {port}
+ExecStart={python_path} -m uvicorn artfight_feed.main:app --host {host} --port {port}
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=artfight-rss
+SyslogIdentifier=artfight-feed
 
 # Security settings
 NoNewPrivileges=yes
@@ -131,7 +182,7 @@ ReadWritePaths={project_root}
 WantedBy=multi-user.target
 """
 
-    service_file = Path("/etc/systemd/system/artfight-rss.service")
+    service_file = Path("/etc/systemd/system/artfight-feed.service")
     print(f"Creating systemd service file: {service_file}")
 
     with open(service_file, 'w') as f:
@@ -165,10 +216,10 @@ def enable_and_start_service():
     run_command(["systemctl", "daemon-reload"])
 
     # Enable the service
-    run_command(["systemctl", "enable", "artfight-rss"])
+    run_command(["systemctl", "enable", "artfight-feed"])
 
     # Start the service
-    run_command(["systemctl", "start", "artfight-rss"])
+    run_command(["systemctl", "start", "artfight-feed"])
 
     print("✅ Service enabled and started")
 
@@ -227,18 +278,18 @@ def verify_database_path(project_root: Path, user: str):
 def check_service_status():
     """Check the service status."""
     print("\n🔍 Checking service status...")
-    run_command(["systemctl", "status", "artfight-rss"], check=False)
+    run_command(["systemctl", "status", "artfight-feed"], check=False)
 
     print("\n📋 Service management commands:")
-    print("  View logs:     journalctl -u artfight-rss -f")
-    print("  Stop service:  sudo systemctl stop artfight-rss")
-    print("  Start service: sudo systemctl start artfight-rss")
-    print("  Restart:       sudo systemctl restart artfight-rss")
-    print("  Disable:       sudo systemctl disable artfight-rss")
+    print("  View logs:     journalctl -u artfight-feed -f")
+    print("  Stop service:  sudo systemctl stop artfight-feed")
+    print("  Start service: sudo systemctl start artfight-feed")
+    print("  Restart:       sudo systemctl restart artfight-feed")
+    print("  Disable:       sudo systemctl disable artfight-feed")
 
 def main():
     """Main setup function."""
-    print("🚀 ArtFight RSS Service - Systemd Setup")
+    print("🚀 ArtFight Feed Service - Systemd Setup")
     print("=" * 50)
 
     # Check if running as root
@@ -271,7 +322,8 @@ def main():
 
     # Get user input
     print("\n📝 Configuration:")
-    user = get_user_input("Service user", "artfight-rss")
+    print("Warning: If you are upgrading from ArtFight RSS Service, you likely want to use the old default user and group (artfight-rss)")
+    user = get_user_input("Service user", "artfight-feed")
     group = get_user_input("Service group", user)
     host = get_user_input("Service host", default_host)
     port = get_user_input("Service port", default_port)
@@ -314,9 +366,10 @@ def main():
 
     # Confirm installation
     print("\n⚠️  This will:")
+    print(f"   - Clean up any existing artfight-rss service files (NOT THE DATABASE)")
     print(f"   - Create a Python virtual environment in {project_root}/venv")
     print("   - Install dependencies from pyproject.toml")
-    print("   - Create systemd service: /etc/systemd/system/artfight-rss.service")
+    print("   - Create systemd service: /etc/systemd/system/artfight-feed.service")
     print(f"   - Set ownership of {project_root} to {user}:{group}")
     print("   - Enable and start the service")
     print(f"   - The service will run on {host}:{port}")
@@ -327,6 +380,9 @@ def main():
         sys.exit(0)
 
     try:
+        # Clean up old service first
+        cleanup_old_service()
+
         # Create virtual environment
         python_path, pip_path = create_venv(project_root, user, group)
 
@@ -350,12 +406,14 @@ def main():
         # Check status
         check_service_status()
 
-        print("\n🎉 ArtFight RSS Service has been successfully installed as a systemd service!")
+        print("\n🎉 ArtFight Feed Service has been successfully installed as a systemd service!")
         print(f"   The service is now running on http://{host}:{port}")
         print("   RSS feeds will be available at:")
-        print(f"   - http://{host}:{port}/rss/username/attacks")
-        print(f"   - http://{host}:{port}/rss/username/defenses")
-        print(f"   - http://{host}:{port}/rss/standings")
+        print(f"   - http://{host}:{port}/atom/attacks/username1+username2")
+        print(f"   - http://{host}:{port}/atom/defenses/username1+username2")
+        print(f"   - http://{host}:{port}/atom/standings")
+        print(f"   - http://{host}:{port}/atom/news")
+        print(f"   - http://{host}:{port}/atom/combined/username1+username2")
         print(f"\n📁 Virtual environment: {project_root}/venv")
         print(f"   To update dependencies: sudo -u {user} {pip_path} install -e {project_root} --upgrade")
 

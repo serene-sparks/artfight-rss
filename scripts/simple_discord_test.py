@@ -11,7 +11,7 @@ sys.path.insert(0, str(project_root))
 
 import discord
 
-from artfight_rss.config import settings
+from artfight_feed.config import settings
 
 
 async def simple_test():

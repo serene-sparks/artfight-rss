@@ -1,4 +1,4 @@
-"""Main FastAPI application for the ArtFight RSS service."""
+"""Main FastAPI application for the ArtFight feed service."""
 
 import asyncio
 import os
@@ -18,7 +18,7 @@ from .discord_bot import discord_bot
 from .event_handlers import setup_event_handlers
 from .logging_config import get_logger, setup_logging
 from .monitor import ArtFightMonitor
-from .rss import rss_generator
+from .atom import atom_generator
 
 # Set up logging configuration
 setup_logging()
@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI):
     run_migrations()
 
 
-    logger.info("Starting ArtFight RSS service...")
+    logger.info("Starting ArtFight feed service...")
 
 
     # Initialize components
@@ -99,22 +99,22 @@ async def lifespan(app: FastAPI):
         await discord_bot.start()
         logger.info("Discord bot started")
 
-    logger.info("ArtFight RSS service started successfully")
+    logger.info("ArtFight feed service started successfully")
 
     yield
 
     # Cleanup
-    logger.info("Shutting down ArtFight RSS service...")
+    logger.info("Shutting down ArtFight feed service...")
     if settings.discord_enabled:
         await discord_bot.stop()
     await monitor.stop()
-    logger.info("ArtFight RSS service shutdown complete")
+    logger.info("ArtFight feed service shutdown complete")
 
 
 # Create FastAPI app
 app = FastAPI(
-    title="ArtFight RSS Service",
-    description="Generate RSS feeds for ArtFight profiles and team standings",
+    title="ArtFight feed Service",
+    description="Generate atom feeds for ArtFight profiles and team standings",
     version="0.1.0",
     lifespan=lifespan
 )
@@ -152,7 +152,7 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "service": "artfight-rss",
+        "service": "artfight-feed",
         "version": "0.1.0"
     }
 
@@ -163,16 +163,25 @@ async def get_stats():
     return monitor.get_stats()
 
 
+@app.post("/monitor/reset-no-event-detection")
+async def reset_no_event_detection():
+    """Manually reset the no event detection counter and restart team monitoring."""
+    try:
+        monitor.reset_battle_over_detection()
+        return {"message": "No event detection counter reset successfully", "status": "success"}
+    except Exception as e:
+        logger.error(f"Error resetting no event detection: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset no event detection: {e}")
 
 
 
-@app.get("/rss/standings")
-async def get_team_standings_changes_rss(limit: int = Query(None, description="Maximum number of items to return")):
-    """Get RSS feed for team standing changes (daily updates and leader changes)."""
+@app.get("/atom/standings")
+async def get_team_standings_changes_atom(limit: int = Query(None, description="Maximum number of items to return")):
+    """Get atom feed for team standing changes (daily updates and leader changes)."""
     try:
         # Get team standing changes from database with limit
         standings = database.get_team_standing_changes(days=30, limit=limit)
-        feed = rss_generator.generate_team_changes_feed(standings)
+        feed = atom_generator.generate_team_changes_feed(standings)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -182,8 +191,24 @@ async def get_team_standings_changes_rss(limit: int = Query(None, description="M
     )
 
 
-@app.get("/rss/attacks/{usernames}")
-async def get_multiuser_attacks_rss(
+@app.get("/atom/news")
+async def get_news_atom(limit: int = Query(None, description="Maximum number of items to return")):
+    """Get atom feed for ArtFight news posts."""
+    try:
+        # Get news posts from database with limit
+        news_posts = database.get_news(limit=limit)
+        feed = atom_generator.generate_news_feed(news_posts)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return PlainTextResponse(
+        feed.to_atom_xml(),
+        media_type="application/atom+xml"
+    )
+
+
+@app.get("/atom/attacks/{usernames}")
+async def get_multiuser_attacks_atom(
     username_list: list[str] = Depends(validate_users),
     limit: int = Query(None, description="Maximum number of items to return")
 ):
@@ -194,7 +219,7 @@ async def get_multiuser_attacks_rss(
 
         # Get attacks for all users
         attacks = database.get_attacks_for_users(username_list, limit=limit)
-        feed = rss_generator.generate_multiuser_attacks_feed(username_list, attacks)
+        feed = atom_generator.generate_multiuser_attacks_feed(username_list, attacks)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -204,19 +229,19 @@ async def get_multiuser_attacks_rss(
     )
 
 
-@app.get("/rss/defenses/{usernames}")
-async def get_multiuser_defenses_rss(
+@app.get("/atom/defenses/{usernames}")
+async def get_multiuser_defenses_atom(
     username_list: list[str] = Depends(validate_users),
     limit: int = Query(None, description="Maximum number of items to return")
 ):
-    """Get RSS feed for multiple users' defenses."""
+    """Get atom feed for multiple users' defenses."""
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
 
         # Get defenses for all users
         defenses = database.get_defenses_for_users(username_list, limit=limit)
-        feed = rss_generator.generate_multiuser_defenses_feed(username_list, defenses)
+        feed = atom_generator.generate_multiuser_defenses_feed(username_list, defenses)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -226,12 +251,12 @@ async def get_multiuser_defenses_rss(
     )
 
 
-@app.get("/rss/combined/{usernames}")
-async def get_multiuser_combined_rss(
+@app.get("/atom/combined/{usernames}")
+async def get_multiuser_combined_atom(
     username_list: list[str] = Depends(validate_users),
     limit: int = Query(None, description="Maximum number of items to return")
 ):
-    """Get combined RSS feed for multiple users' attacks and defenses."""
+    """Get combined atom feed for multiple users' attacks and defenses."""
     try:
         # Fetch fresh data and emit events
         await fetch_and_emit_events_for_users(username_list)
@@ -247,7 +272,7 @@ async def get_multiuser_combined_rss(
 
         attacks = database.get_attacks_for_users(username_list, limit=attack_limit)
         defenses = database.get_defenses_for_users(username_list, limit=defense_limit)
-        feed = rss_generator.generate_multiuser_combined_feed(username_list, attacks, defenses)
+        feed = atom_generator.generate_multiuser_combined_feed(username_list, attacks, defenses)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -374,7 +399,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "artfight_rss.main:app",
+        "artfight_feed.main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.live_reload,

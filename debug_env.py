@@ -3,7 +3,7 @@
 
 import os
 
-from artfight_rss.config import settings
+from artfight_feed.config import settings
 
 print("🔍 Environment Variable Debug")
 print("=" * 50)

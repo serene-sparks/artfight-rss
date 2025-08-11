@@ -5,12 +5,12 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add the parent directory to the path so we can import artfight_rss
+# Add the parent directory to the path so we can import artfight_feed
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from artfight_rss.plotting import save_team_standings_plot
-from artfight_rss.config import settings
-from artfight_rss.logging_config import get_logger
+from artfight_feed.plotting import save_team_standings_plot
+from artfight_feed.config import settings
+from artfight_feed.logging_config import get_logger
 
 logger = get_logger(__name__)
 

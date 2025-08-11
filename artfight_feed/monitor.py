@@ -9,7 +9,7 @@ from .cache import RateLimiter, SQLiteCache
 from .config import settings
 from .discord_bot import discord_bot
 from .logging_config import get_logger
-from .models import TeamStanding, ArtFightAttack, ArtFightDefense
+from .models import TeamStanding, ArtFightAttack, ArtFightDefense, ArtFightNews
 
 logger = get_logger(__name__)
 
@@ -28,17 +28,57 @@ class ArtFightMonitor:
         self.last_team_sides: dict[str, str] = {}  # team_name -> side
         self.last_team_update: datetime | None = None
 
+        # Battle over detection tracking
+        self.consecutive_battle_over_count: int = 0
+        self.battle_over_detection_enabled: bool = False
+
         # Background task handles
         self.team_task: asyncio.Task | None = None
         self.user_task: asyncio.Task | None = None
+        self.news_task: asyncio.Task | None = None
         self.running = False
 
         # Event handlers
         self.event_handlers: dict[str, list[Callable]] = {
             'new_attack': [],
             'new_defense': [],
-            'team_standing_update': []
+            'team_standing_update': [],
+            'new_news': [],
+            'post_revised': []
         }
+
+        # Initialize battle over detection if enabled
+        if settings.battle_over_detection:
+            self.battle_over_detection_enabled = True
+            logger.info("Battle over detection enabled - will stop team checks after 3 consecutive failures")
+
+    def _should_stop_team_monitoring(self) -> bool:
+        """Check if team monitoring should be stopped due to consecutive battle over detections."""
+        if not self.battle_over_detection_enabled:
+            return False
+        
+        if self.consecutive_battle_over_count >= 3:
+            logger.warning(f"Stopping team monitoring after {self.consecutive_battle_over_count} consecutive 'battle over' detections")
+            return True
+        
+        return False
+
+    def _record_battle_over_detection(self) -> None:
+        """Record a battle over detection and potentially stop team monitoring."""
+        if not self.battle_over_detection_enabled:
+            return
+        
+        self.consecutive_battle_over_count += 1
+        logger.info(f"Battle over detection #{self.consecutive_battle_over_count}/3")
+        
+        if self._should_stop_team_monitoring():
+            self.running = False
+
+    def _reset_battle_over_detection(self) -> None:
+        """Reset the consecutive battle over detection counter when an event is found."""
+        if self.consecutive_battle_over_count > 0:
+            logger.info(f"Resetting battle over detection counter (was {self.consecutive_battle_over_count})")
+            self.consecutive_battle_over_count = 0
 
     def add_event_handler(self, event_type: str, handler: Callable) -> None:
         """Add an event handler for a specific event type."""
@@ -76,6 +116,13 @@ class ArtFightMonitor:
         else:
             logger.info("ArtFight team monitor started (no users configured)")
 
+        # Start background task for news monitoring if enabled
+        if settings.monitor_news:
+            self.news_task = asyncio.create_task(self._news_monitor_loop())
+            logger.info("ArtFight news monitor started")
+        else:
+            logger.info("ArtFight news monitor disabled")
+
     async def stop(self) -> None:
         """Stop the monitoring service."""
         if not self.running:
@@ -103,6 +150,15 @@ class ArtFightMonitor:
             except asyncio.TimeoutError:
                 logger.warning("User task did not stop within timeout")
 
+        if self.news_task:
+            self.news_task.cancel()
+            try:
+                await asyncio.wait_for(self.news_task, timeout=5.0)
+            except asyncio.CancelledError:
+                pass
+            except asyncio.TimeoutError:
+                logger.warning("News task did not stop within timeout")
+
         # Close ArtFight client
         try:
             await asyncio.wait_for(self.artfight_client.close(), timeout=5.0)
@@ -115,6 +171,11 @@ class ArtFightMonitor:
         """Background loop for monitoring team standings."""
         while self.running:
             try:
+                # Check if team monitoring should be stopped due to no event detection
+                if self._should_stop_team_monitoring():
+                    logger.info("Team monitoring stopped due to no event detection")
+                    break
+                
                 await self._fetch_team_standings()
                 # Use wait_for to make sleep cancellable
                 await asyncio.wait_for(
@@ -141,7 +202,12 @@ class ArtFightMonitor:
         """Fetch team standings and emit events for new data."""
         standings = await self.artfight_client.get_team_standings()
         if not standings:
+            # Record battle over detection if no standings found
+            self._record_battle_over_detection()
             return
+
+        # Reset battle over detection counter when standings are found
+        self._reset_battle_over_detection()
 
         # Emit events for each standing - let handlers decide what to do
         for standing in standings:
@@ -257,4 +323,92 @@ class ArtFightMonitor:
             "last_team_update": self.last_team_update.isoformat() if self.last_team_update else None,
             "tracked_teams": len(self.last_team_sides),
             "cache_stats": self.cache.get_stats(),
+            "no_event_detection": {
+                "enabled": self.battle_over_detection_enabled,
+                "consecutive_count": self.consecutive_battle_over_count,
+                "stopped": self._should_stop_team_monitoring()
+            }
         }
+
+    def reset_battle_over_detection(self) -> None:
+        """Manually reset the battle over detection counter and restart team monitoring."""
+        if not self.battle_over_detection_enabled:
+            logger.info("Battle over detection is not enabled")
+            return
+        
+        if self.consecutive_battle_over_count > 0:
+            logger.info(f"Manually resetting battle over detection counter from {self.consecutive_battle_over_count}")
+            self.consecutive_battle_over_count = 0
+        
+        if not self.running and self._should_stop_team_monitoring():
+            logger.info("Restarting team monitoring after manual reset")
+            self.running = True
+            if not self.team_task or self.team_task.done():
+                self.team_task = asyncio.create_task(self._team_monitor_loop())
+
+    async def _news_monitor_loop(self) -> None:
+        """Background loop for monitoring news posts."""
+        while self.running:
+            try:
+                await self._fetch_news_posts()
+                # Use wait_for to make sleep cancellable
+                await asyncio.wait_for(
+                    asyncio.sleep(settings.news_check_interval_sec),
+                    timeout=settings.news_check_interval_sec
+                )
+            except asyncio.CancelledError:
+                logger.info("News monitor loop cancelled")
+                break
+            except asyncio.TimeoutError:
+                # This is expected, continue the loop
+                continue
+            except Exception as e:
+                logger.error(f"Error in news monitor loop: {e}")
+                try:
+                    await asyncio.wait_for(asyncio.sleep(300), timeout=300)
+                except asyncio.CancelledError:
+                    logger.info("News monitor loop cancelled during error recovery")
+                    break
+                except asyncio.TimeoutError:
+                    continue
+
+    async def _fetch_news_posts(self) -> None:
+        """Fetch news posts and emit events for new ones and revisions."""
+        try:
+            # Get previously seen news IDs from database BEFORE fetching new ones
+            previous_news_ids = self.database.get_existing_news_ids()
+            
+            news_posts = await self.artfight_client.get_news_posts()
+            if not news_posts:
+                logger.warning("No news posts found. Did the ArtFight website change?")
+                return
+
+            # Get current news IDs
+            current_news_ids = {news.id for news in news_posts}
+
+            # Find new news posts
+            new_news_ids = current_news_ids - previous_news_ids
+
+            if new_news_ids or current_news_ids:
+                logger.info(f"Processing {len(new_news_ids)} new news posts and checking {len(current_news_ids)} existing posts for revisions")
+
+                # Save news posts to database (this will detect changes and create revisions)
+                # save_news now returns (current_post, old_post_if_revised) tuples
+                save_results = self.database.save_news(news_posts)
+
+                # Process results and emit appropriate events
+                for current_post, old_post in save_results:
+                    if old_post is not None:
+                        # This post was revised - emit revision event
+                        logger.info(f"News post {current_post.id} was revised, emitting post_revised event")
+                        await self.emit_event('post_revised', {
+                            'old_post': old_post,
+                            'new_post': current_post
+                        })
+                    elif current_post.id in new_news_ids:
+                        # This is a new post - emit new_news event
+                        logger.info(f"New news post {current_post.id} found, emitting new_news event")
+                        await self.emit_event('new_news', current_post)
+
+        except Exception as e:
+            logger.error(f"Error fetching news posts: {e}")

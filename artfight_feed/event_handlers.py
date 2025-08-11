@@ -5,7 +5,10 @@ from datetime import datetime, UTC
 from .config import settings
 from .discord_bot import discord_bot
 from .logging_config import get_logger
-from .models import TeamStanding, ArtFightAttack, ArtFightDefense
+from .models import TeamStanding, ArtFightAttack, ArtFightDefense, ArtFightNews
+
+from redlines import Redlines
+import html2text
 
 logger = get_logger(__name__)
 
@@ -64,6 +67,18 @@ class DiscordEventHandler:
         else:
             logger.debug(f"Skipping Discord notification for team standings (not included in RSS feed)")
 
+    async def handle_new_news(self, news: ArtFightNews) -> None:
+        """Handle new news event by sending Discord notification."""
+        if settings.discord_notify_news:
+            await discord_bot.send_news_notification(news)
+
+    async def handle_post_revised(self, revision_data: dict) -> None:
+        """Handle post revised event by sending Discord notification."""
+        if settings.discord_notify_news:
+            old_post = revision_data['old_post']
+            new_post = revision_data['new_post']
+            await discord_bot.send_news_revision_notification(old_post, new_post)
+
 
 class LoggingEventHandler:
     """Handles logging for monitor events."""
@@ -91,6 +106,59 @@ class LoggingEventHandler:
         else:
             logger.debug(f"Team standing update: {standing.team1_percentage:.2f}% vs {100-standing.team1_percentage:.2f}%")
 
+    async def handle_new_news(self, news: ArtFightNews) -> None:
+        """Log new news event."""
+        logger.info(f"New news post detected: {news.title} (ID: {news.id})")
+
+    async def handle_post_revised(self, revision_data: dict) -> None:
+        """Log post revised event with visual differences."""
+        old_post = revision_data['old_post']
+        new_post = revision_data['new_post']
+        
+        # Convert HTML to markdown for content comparison (same logic as database and Discord bot)
+        h = html2text.HTML2Text()
+        h.ignore_links = False
+        h.ignore_images = False
+        h.body_width = 0
+        
+        old_markdown = h.handle(old_post.content).strip() if old_post.content else ""
+        new_markdown = h.handle(new_post.content).strip() if new_post.content else ""
+        
+        # Log basic revision info
+        logger.info(f"News post revised: {new_post.title} (ID: {new_post.id})")
+        
+        # Log content changes with visual diff if available
+        if old_markdown != new_markdown and old_post.content and new_post.content:
+            try:
+                # Convert HTML to markdown for cleaner comparison
+                h = html2text.HTML2Text()
+                h.ignore_links = False
+                h.ignore_images = False
+                h.body_width = 0  # Don't wrap text
+                
+                old_markdown = h.handle(old_post.content).strip()
+                new_markdown = h.handle(new_post.content).strip()
+                
+                # Generate diff for markdown content changes
+                diff = Redlines(old_markdown, new_markdown)
+                diff_markdown = diff.output_markdown
+                
+                # Truncate for logging if too long
+                if len(diff_markdown) > 500:
+                    diff_markdown = diff_markdown[:497] + "..."
+                
+                logger.info(f"  Content changed - Visual diff:\n{diff_markdown}")
+                    
+            except Exception as e:
+                logger.warning(f"  Content changed but failed to generate visual diff: {e}")
+                logger.info(f"  Content length: {len(old_post.content)} -> {len(new_post.content)} chars")
+        # Log title changes
+        if old_post.title != new_post.title:
+            logger.info(f"  Title changed: '{old_post.title}' -> '{new_post.title}'")
+        
+        # Note: We only log revisions for title/content changes, not time/editor changes
+        logger.info(f"  Revision detected for news post {new_post.id} - Title or content changed")
+
 
 def setup_event_handlers(monitor) -> None:
     """Set up event handlers for the monitor."""
@@ -102,10 +170,14 @@ def setup_event_handlers(monitor) -> None:
     monitor.add_event_handler('new_attack', discord_handler.handle_new_attack)
     monitor.add_event_handler('new_defense', discord_handler.handle_new_defense)
     monitor.add_event_handler('team_standing_update', discord_handler.handle_team_standing_update)
+    monitor.add_event_handler('new_news', discord_handler.handle_new_news)
+    monitor.add_event_handler('post_revised', discord_handler.handle_post_revised)
 
     # Register logging event handlers
     monitor.add_event_handler('new_attack', logging_handler.handle_new_attack)
     monitor.add_event_handler('new_defense', logging_handler.handle_new_defense)
     monitor.add_event_handler('team_standing_update', logging_handler.handle_team_standing_update)
+    monitor.add_event_handler('new_news', logging_handler.handle_new_news)
+    monitor.add_event_handler('post_revised', logging_handler.handle_post_revised)
 
     logger.info("Event handlers registered for monitor") 

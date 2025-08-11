@@ -143,3 +143,4 @@ cache/
 logs/
 *.log 
 *.db
+team_standings_plot.png

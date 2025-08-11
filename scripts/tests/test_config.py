@@ -5,10 +5,10 @@ import os
 import sys
 from pathlib import Path
 
-# Add the artfight_rss directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'artfight_rss'))
+# Add the artfight_feed directory to the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'artfight_feed'))
 
-from artfight_rss.config import get_config_paths, load_config, load_toml_config
+from artfight_feed.config import get_config_paths, load_config, load_toml_config
 
 
 def test_config_loading():

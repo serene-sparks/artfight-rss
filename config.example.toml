@@ -1,8 +1,9 @@
-# ArtFight RSS Service Configuration
+# ArtFight Atom Service Configuration
 
 # General settings
 request_interval_sec = 300  # Minimum seconds between requests to ArtFight (5 minutes)
 team_check_interval_sec = 300  # How often to check team standings (30 minutes)
+battle_over_detection = false  # Stop team checks after 3 consecutive 'battle over' detections
 
 # ArtFight settings
 artfight_base_url = "https://artfight.net"
@@ -17,7 +18,7 @@ host = "0.0.0.0"
 port = 8000
 debug = false
 
-# RSS feed settings
+# Atom feed settings
 max_users_per_feed = 5  # Maximum number of users allowed in a single multiuser feed
 max_feed_items = 50     # Maximum number of items returned in a feed
 
@@ -39,6 +40,7 @@ discord_notify_attacks = true      # Send notifications for new attacks
 discord_notify_defenses = true     # Send notifications for new defenses
 discord_notify_team_changes = true # Send notifications for team standing changes
 discord_notify_leader_changes = true # Send notifications for leader changes
+discord_include_team_balance_plot = true # Include team balance subplot (user counts and differences) in Discord charts
 discord_startup_timeout = 120      # Discord bot startup timeout in seconds (increase for remote servers)
 
 # User monitoring configuration

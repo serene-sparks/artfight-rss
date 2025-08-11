@@ -13,9 +13,9 @@ from datetime import UTC, datetime
 
 from pydantic import HttpUrl
 
-from artfight_rss.config import settings
-from artfight_rss.discord_bot import discord_bot
-from artfight_rss.models import ArtFightAttack, ArtFightDefense, TeamStanding
+from artfight_feed.config import settings
+from artfight_feed.discord_bot import discord_bot
+from artfight_feed.models import ArtFightAttack, ArtFightDefense, TeamStanding
 
 
 async def test_discord_bot():

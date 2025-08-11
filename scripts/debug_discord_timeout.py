@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 import discord
 from discord.ext import commands
 
-from artfight_rss.config import settings
+from artfight_feed.config import settings
 
 
 async def debug_discord_timeout():

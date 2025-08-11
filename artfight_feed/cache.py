@@ -64,7 +64,7 @@ class RateLimiter:
         """Record that a request was made."""
         self.database.set_rate_limit(key, self.min_interval)
 
-    def wait_if_needed(self, key: str) -> None:
+    async def wait_if_needed(self, key: str) -> None:
         """Wait if rate limit would be exceeded."""
         if not self.can_request(key):
             # In a real implementation, you might want to sleep here

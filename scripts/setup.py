@@ -48,7 +48,7 @@ def main():
     print("1. Edit config.toml with your Discord webhook URLs and ArtFight usernames")
     print("2. Edit .env with your environment variables (optional)")
     print("3. Install dependencies: uv sync")
-    print("4. Run the service: uv run python -m artfight_rss.main")
+    print("4. Run the service: uv run python -m artfight_feed.main")
     print("\nFor more information, see README.md")
 
 

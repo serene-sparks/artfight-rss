@@ -5,10 +5,10 @@ import asyncio
 import logging
 from datetime import datetime
 
-from artfight_rss.artfight import ArtFightClient
-from artfight_rss.cache import RateLimiter
-from artfight_rss.config import settings
-from artfight_rss.database import ArtFightDatabase
+from artfight_feed.artfight import ArtFightClient
+from artfight_feed.cache import RateLimiter
+from artfight_feed.config import settings
+from artfight_feed.database import ArtFightDatabase
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)

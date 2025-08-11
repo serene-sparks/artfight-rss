@@ -157,9 +157,21 @@ class Settings(BaseSettings):
         default=3600,  # 1 hour
         description="How often to check team standings (seconds)"
     )
+    news_check_interval_sec: int = Field(
+        default=1800,  # 30 minutes
+        description="How often to check for new news posts (seconds)"
+    )
+    monitor_news: bool = Field(
+        default=True,
+        description="Whether to monitor for new ArtFight news posts"
+    )
     team_switch_threshold_sec: int = Field(
         default=24 * 3600,  # 24 hours
         description="Seconds since last switch before forcing update"
+    )
+    battle_over_detection: bool = Field(
+        default=False,
+        description="When enabled, stops team standings checks after 3 consecutive 'battle over' detections"
     )
     page_request_delay_sec: float = Field(
         default=3.0,  # 3 seconds
@@ -293,6 +305,14 @@ class Settings(BaseSettings):
         default=True,
         description="Whether to send Discord notifications for leader changes"
     )
+    discord_notify_news: bool = Field(
+        default=True,
+        description="Whether to send Discord notifications for new news posts"
+    )
+    discord_include_team_balance_plot: bool = Field(
+        default=False,
+        description="Whether to include the team balance subplot (user counts and differences) in Discord charts"
+    )
     discord_startup_timeout: int = Field(
         default=120,
         description="Discord bot startup timeout in seconds (default: 120 for remote servers)"
@@ -318,9 +338,9 @@ def get_config_paths() -> list[Path]:
     return [
         current_dir / "config.toml",
         current_dir / "config" / "config.toml",
-        current_dir / "artfight_rss" / "config.toml",
-        Path.home() / ".config" / "artfight-rss" / "config.toml",
-        Path("/etc/artfight-rss/config.toml"),
+        current_dir / "artfight_feed" / "config.toml",
+        Path.home() / ".config" / "artfight-feed" / "config.toml",
+        Path("/etc/artfight-feed/config.toml"),
     ]
 
 

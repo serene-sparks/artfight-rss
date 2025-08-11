@@ -6,7 +6,12 @@ This guide will help you set up the ArtFight RSS Service to monitor profiles and
 
 - Python 3.11 or higher
 - `uv` package manager (recommended) or `pip`
-- Discord server with RSS bot permissions
+
+## Note:
+This project was formerly called ArtFight RSS Service, but has been renamed to ArtFight Feed Service.
+If you have an existing installation using the old name, you can use the old name for existing files.
+Do note that systemd is an exception and will need to be updated to the new name.
+Delete the old systemd service file and create a new one with the new name.
 
 ## Quick Start
 
@@ -50,6 +55,7 @@ Edit `config.toml` with your settings:
 # General settings
 request_interval = 300  # Minimum seconds between requests to ArtFight (5 minutes)
 team_check_interval = 3600  # How often to check team standings (1 hour)
+no_event_detection = false  # Stop team checks after 3 consecutive 'no event' detections
 team_switch_threshold = 24  # Hours since last switch before forcing update
 page_request_delay = 3.0  # Delay between page requests during pagination
 page_request_wobble = 0.2  # Random wobble factor for delays
@@ -79,7 +85,7 @@ monitor_list = [
 ]
 
 # Whitelist of supported ArtFight profiles (optional)
-# If empty, all profiles are allowed
+# If empty, all profiles are allowed. This is not recommended.
 whitelist = [
     "your_artfight_username",
     "another_username",
@@ -91,20 +97,22 @@ whitelist = [
 
 #### Development
 ```bash
-uv run python -m artfight_rss.main
+uv run python -m artfight_feed.main
 ```
 
 #### Production - Manual Start
 ```bash
-uv run uvicorn artfight_rss.main:app --host 0.0.0.0 --port 8000
+uv run uvicorn artfight_feed.main:app --host 0.0.0.0 --port 8000
 ```
 
 #### Production - Systemd Service (Recommended)
 For production deployment, install as a systemd service for automatic startup and management:
 
+Old installations: see the note at the top of this file.
+
 ```bash
 # Create a dedicated user (optional but recommended)
-sudo useradd -r -s /bin/false artfight-rss
+sudo useradd -r -s /bin/false artfight-feed
 
 # Run the setup script
 sudo python scripts/setup_systemd.py
@@ -211,6 +219,7 @@ If the whitelist is empty or not configured, all profiles are allowed.
 
 - `request_interval`: Minimum time between requests to avoid overwhelming ArtFight
 - `team_check_interval`: How often to check for team standing updates
+- `no_event_detection`: When enabled, stops team checks after 3 consecutive "no event scheduled" detections
 - `page_request_delay`: Delay between paginated requests
 - `page_request_wobble`: Random variation in delays (±20% by default)
 
@@ -229,6 +238,7 @@ Once running, the service provides these endpoints:
 - `GET /stats` - Monitoring statistics
 - `GET /users` - List configured users
 - `POST /webhook/teams` - Manual team check trigger
+- `POST /monitor/reset-no-event-detection` - Reset no event detection counter and restart team monitoring
 
 ### Cache Management
 - `GET /cache/stats` - Cache statistics

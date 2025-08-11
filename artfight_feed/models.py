@@ -11,7 +11,7 @@ from sqlmodel import SQLModel, Field as SQLField
 class ArtFightAttack(SQLModel, table=True):
     """Represents an ArtFight attack."""
 
-    __tablename__ = "attacks"
+    __tablename__ = "attacks" # type: ignore
 
     id: str = SQLField(primary_key=True, description="Unique attack ID")
     title: str = SQLField(description="Attack title")
@@ -40,7 +40,7 @@ class ArtFightAttack(SQLModel, table=True):
 class ArtFightDefense(SQLModel, table=True):
     """Represents an ArtFight defense."""
 
-    __tablename__ = "defenses"
+    __tablename__ = "defenses" # type: ignore
 
     id: str = SQLField(primary_key=True, description="Unique defense ID")
     title: str = SQLField(description="Defense title")
@@ -69,7 +69,7 @@ class ArtFightDefense(SQLModel, table=True):
 class TeamStanding(SQLModel, table=True):
     """Represents a team standing update."""
 
-    __tablename__ = "team_standings"
+    __tablename__ = "team_standings" # type: ignore
 
     id: int | None = SQLField(default=None, primary_key=True, description="Primary key")
     team1_percentage: float = SQLField(description="Percentage of team 1 (0.0-100.0)")
@@ -157,9 +157,94 @@ class TeamStanding(SQLModel, table=True):
         }
 
 
+class ArtFightNews(SQLModel, table=True):
+    """Represents an ArtFight news post."""
+
+    __tablename__ = "news" # type: ignore
+
+    id: int = SQLField(primary_key=True, description="Unique news post ID")
+    title: str = SQLField(description="News post title")
+    content: str | None = SQLField(default=None, description="News post content (full content)")
+    author: str | None = SQLField(default=None, description="Author of the news post")
+    posted_at: datetime | None = SQLField(default=None, description="When the news post was posted")
+    edited_at: datetime | None = SQLField(default=None, description="When the news post was last edited")
+    edited_by: str | None = SQLField(default=None, description="Who edited the news post")
+    url: str = SQLField(description="URL to the news post on ArtFight")
+    fetched_at: datetime = SQLField(description="When the news post was first fetched")
+    first_seen: datetime = SQLField(description="When this news post was first seen")
+    last_updated: datetime = SQLField(description="When this news post was last updated")
+
+    def to_atom_item(self) -> dict:
+        """Convert to Atom item format."""
+        description = f"New ArtFight news post: {self.title}"
+        if self.author:
+            description += f"\n\nPosted by: {self.author}"
+        if self.posted_at:
+            description += f"\nPosted on: {self.posted_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        if self.edited_at and self.edited_by:
+            description += f"\nEdited by: {self.edited_by} on {self.edited_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        if self.content:
+            # Truncate content to reasonable length for RSS
+            content_preview = self.content[:500] + "..." if len(self.content) > 500 else self.content
+            description += f"\n\n{content_preview}"
+
+        return {
+            "title": self.title,
+            "description": description,
+            "link": str(self.url),
+            "published": self.posted_at or self.fetched_at,
+            "entry_id": str(self.url),
+            "author": self.author,
+            "image_url": None,
+        }
+
+
+class NewsRevision(SQLModel, table=True):
+    """Represents a revision of an ArtFight news post."""
+
+    __tablename__ = "news_revisions" # type: ignore
+
+    id: int | None = SQLField(default=None, primary_key=True, description="Primary key")
+    news_id: int = SQLField(description="ID of the news post this revision is for")
+    revision_number: int = SQLField(description="Revision number (1, 2, 3, etc.)")
+    title: str = SQLField(description="News post title at this revision")
+    content: str | None = SQLField(default=None, description="News post content at this revision")
+    author: str | None = SQLField(default=None, description="Author of the news post")
+    posted_at: datetime | None = SQLField(default=None, description="When the news post was posted")
+    edited_at: datetime | None = SQLField(default=None, description="When the news post was edited to this revision")
+    edited_by: str | None = SQLField(default=None, description="Who edited the news post to this revision")
+    url: str = SQLField(description="URL to the news post on ArtFight")
+    fetched_at: datetime = SQLField(description="When this revision was fetched")
+    created_at: datetime = SQLField(default_factory=lambda: datetime.now(UTC), description="When this revision record was created")
+
+    def to_atom_item(self) -> dict:
+        """Convert to Atom item format."""
+        description = f"News post revision: {self.title}"
+        if self.author:
+            description += f"\n\nPosted by: {self.author}"
+        if self.posted_at:
+            description += f"\nPosted on: {self.posted_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        if self.edited_at and self.edited_by:
+            description += f"\nEdited by: {self.edited_by} on {self.edited_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        if self.content:
+            # Truncate content to reasonable length for RSS
+            content_preview = self.content[:500] + "..." if len(self.content) > 500 else self.content
+            description += f"\n\n{content_preview}"
+
+        return {
+            "title": f"Revision {self.revision_number}: {self.title}",
+            "description": description,
+            "link": str(self.url),
+            "published": self.edited_at or self.posted_at or self.fetched_at,
+            "entry_id": f"{self.url}-rev-{self.revision_number}",
+            "author": self.edited_by or self.author,
+            "image_url": None,
+        }
+
+
 class RateLimit(SQLModel, table=True):
     """SQLAlchemy model for rate_limits table."""
-    __tablename__ = "rate_limits"
+    __tablename__ = "rate_limits" # type: ignore
 
     key: str = SQLField(primary_key=True, description="Rate limit key")
     last_request: datetime = SQLField(description="When the last request was made")

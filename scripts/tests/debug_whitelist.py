@@ -7,7 +7,7 @@ from pathlib import Path
 # Add the current directory to Python path
 sys.path.insert(0, str(Path.cwd()))
 
-from artfight_rss.config import get_config_paths, load_toml_config, settings
+from artfight_feed.config import get_config_paths, load_toml_config, settings
 
 
 def debug_whitelist():

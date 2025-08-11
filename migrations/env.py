@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-# Add the parent directory to the path so we can import artfight_rss
+# Add the parent directory to the path so we can import artfight_feed
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from logging.config import fileConfig
@@ -12,8 +12,8 @@ from sqlalchemy import pool
 from alembic import context
 
 # Import our models and config
-from artfight_rss.config import settings
-from artfight_rss.models import SQLModel
+from artfight_feed.config import settings
+from artfight_feed.models import SQLModel
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -46,7 +46,9 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Check for DATABASE_URL environment variable first, fall back to config
+    import os
+    url = os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -65,6 +67,17 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Check for DATABASE_URL environment variable first, fall back to config
+    import os
+    db_url = os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    
+    # Ensure we have a valid URL
+    if not db_url:
+        raise ValueError("No database URL found in environment or config")
+    
+    # Override the config with our database URL
+    config.set_main_option("sqlalchemy.url", db_url)
+    
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

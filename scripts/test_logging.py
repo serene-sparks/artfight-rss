@@ -5,10 +5,10 @@ import os
 import sys
 from pathlib import Path
 
-# Add the artfight_rss directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'artfight_rss'))
+# Add the artfight_feed directory to the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'artfight_feed'))
 
-from artfight_rss.logging_config import setup_logging, get_logger
+from artfight_feed.logging_config import setup_logging, get_logger
 
 
 def test_logging():
@@ -20,10 +20,10 @@ def test_logging():
     setup_logging()
     
     # Get loggers for different modules
-    main_logger = get_logger("artfight_rss.main")
-    artfight_logger = get_logger("artfight_rss.artfight")
-    monitor_logger = get_logger("artfight_rss.monitor")
-    discord_logger = get_logger("artfight_rss.discord_bot")
+    main_logger = get_logger("artfight_feed.main")
+    artfight_logger = get_logger("artfight_feed.artfight")
+    monitor_logger = get_logger("artfight_feed.monitor")
+    discord_logger = get_logger("artfight_feed.discord_bot")
     
     print("\n📝 Testing different log levels:")
     print("-" * 30)
