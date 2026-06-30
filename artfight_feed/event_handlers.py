@@ -93,18 +93,21 @@ class LoggingEventHandler:
 
     async def handle_team_standing_update(self, standing: TeamStanding) -> None:
         """Log team standing update event."""
-        if standing.leader_change:
-            if settings.teams:
-                leader = (
-                    settings.teams.team1.name
-                    if standing.team1_percentage > 50
-                    else settings.teams.team2.name
-                )
-            else:
-                leader = "Team 1" if standing.team1_percentage > 50 else "Team 2"
-            logger.info(f"Leader change detected: {leader} is now leading at {standing.team1_percentage:.2f}%")
+        percentages = standing.percentages()
+        leader_key = standing.leader_key or standing.compute_leader_key()
+        if settings.teams and leader_key:
+            try:
+                leader = settings.teams[leader_key].name
+            except (KeyError, AttributeError):
+                leader = leader_key
         else:
-            logger.debug(f"Team standing update: {standing.team1_percentage:.2f}% vs {100-standing.team1_percentage:.2f}%")
+            leader = leader_key or "Unknown"
+
+        summary = ", ".join(f"{key}: {pct:.2f}%" for key, pct in percentages.items())
+        if standing.leader_change:
+            logger.info(f"Leader change detected: {leader} is now leading ({summary})")
+        else:
+            logger.debug(f"Team standing update: {summary}")
 
     async def handle_new_news(self, news: ArtFightNews) -> None:
         """Log new news event."""

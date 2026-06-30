@@ -1,6 +1,15 @@
-"""Plotting utilities for ArtFight team standings."""
+"""Plotting utilities for ArtFight team standings.
+
+Generalized to support any number of teams (ArtFight has run events with 2
+teams in past years and 3 teams in 2026). Each team is plotted using its
+configured color and name; the team-balance subplot shows each team's user
+count over time instead of a single pairwise difference (which only made
+sense when there were exactly 2 teams).
+"""
 
 import io
+import json
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -12,230 +21,232 @@ from .logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Fallback colors used when a team has no configured color (or no config at all)
+_DEFAULT_COLORS = ["#ff6b6b", "#4ecdc4", "#ffd93d", "#6c5ce7", "#1abc9c", "#e17055"]
 
-def generate_team_standings_plot(team1_name: str, team2_name: str, db_path: Optional[Path] = None, include_team_balance: Optional[bool] = None) -> Optional[discord.File]:
-    """Generate a team standings plot and return it as a Discord file."""
-    try:
-        # Import matplotlib here to avoid adding it as a main dependency
-        import sqlite3
 
-        import matplotlib.dates as mdates
-        import matplotlib.pyplot as plt
+def _team_display(team_key: str, index: int) -> tuple[str, str]:
+    """Return (name, color) for a team key, falling back to sane defaults."""
+    if settings.teams is not None:
+        try:
+            team = settings.teams[team_key]
+            return team.name, team.color
+        except (KeyError, AttributeError):
+            pass
+    return team_key, _DEFAULT_COLORS[index % len(_DEFAULT_COLORS)]
 
-        # Use provided include_team_balance or default from settings
-        if include_team_balance is None:
-            include_team_balance = settings.discord_include_team_balance_plot
 
-        # Use provided db_path or default from settings
-        if db_path is None:
-            db_path = settings.db_path
-            
-        if not db_path.exists():
-            logger.warning("Database file not found for plotting")
-            return None
+def _load_standings_series(db_path: Path) -> Optional[dict]:
+    """Load and reshape team_standings rows into per-team time series.
 
-        # Fetch standings data
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+    Returns a dict with: fetched_times, leader_keys, team_keys (in stable
+    order), and per-team lists: percentages, users, scores. Returns None if
+    there's no data or the DB is missing.
+    """
+    if not db_path.exists():
+        logger.warning("Database file not found for plotting")
+        return None
 
-        cursor.execute("""
-            SELECT team1_percentage, fetched_at, leader_change,
-                   team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                   team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
-            FROM team_standings
-            ORDER BY fetched_at ASC
-        """)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT team_data, leader_key, fetched_at, leader_change
+        FROM team_standings
+        ORDER BY fetched_at ASC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
 
-        data = cursor.fetchall()
-        conn.close()
+    if not rows:
+        logger.warning("No team standings data found for plotting")
+        return None
 
-        if not data:
-            logger.warning("No team standings data found for plotting")
-            return None
+    # Determine a stable, ordered list of team keys: prefer config order,
+    # then fall back to whatever keys show up in the data.
+    if settings.teams is not None:
+        team_keys = list(settings.teams.keys())
+    else:
+        team_keys = []
+    for team_data_json, *_ in rows:
+        for key in json.loads(team_data_json or "{}").keys():
+            if key not in team_keys:
+                team_keys.append(key)
 
-        # Parse the data
-        team1_percentages = []
-        team1_scores = []
-        team2_scores = []
-        team1_users_list = []
-        team2_users_list = []
-        user_differences = []
-        fetched_times = []
-        leader_changes = []
+    fetched_times: list[datetime] = []
+    leader_keys: list[str | None] = []
+    percentages: dict[str, list[float]] = {key: [] for key in team_keys}
+    users: dict[str, list[int]] = {key: [] for key in team_keys}
+    scores: dict[str, list[float]] = {key: [] for key in team_keys}
 
-        for row in data:
-            (team1_percentage, fetched_at_str, leader_change,
-             team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-             team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
+    for team_data_json, leader_key, fetched_at_str, _leader_change in rows:
+        try:
+            fetched_at = datetime.fromisoformat(fetched_at_str)
+        except ValueError:
+            fetched_at = datetime.strptime(fetched_at_str, "%Y-%m-%d %H:%M:%S")
 
-            # Parse the datetime string
-            try:
-                fetched_at = datetime.fromisoformat(fetched_at_str)
-            except ValueError:
-                # Try alternative format if needed
-                fetched_at = datetime.strptime(fetched_at_str, "%Y-%m-%d %H:%M:%S")
+        fetched_times.append(fetched_at)
+        leader_keys.append(leader_key)
 
-            team1_percentages.append(team1_percentage)
-            fetched_times.append(fetched_at)
-            leader_changes.append(bool(leader_change))
+        team_data = json.loads(team_data_json or "{}")
+        for key in team_keys:
+            team = team_data.get(key, {})
+            pct = team.get("percentage")
+            percentages[key].append(pct if pct is not None else float("nan"))
 
-            # Store user counts
-            team1_users_list.append(team1_users or 0)
-            team2_users_list.append(team2_users or 0)
-            
-            # Calculate user difference (team1 - team2)
-            user_diff = (team1_users or 0) - (team2_users or 0)
-            user_differences.append(user_diff)
+            team_users = team.get("users") or 0
+            users[key].append(team_users)
 
-            # Calculate team scores (total points = users * avg_points)
-            team1_score = team1_users * team1_avg_points if team1_users and team1_avg_points else 0
-            team2_score = team2_users * team2_avg_points if team2_users and team2_avg_points else 0
-            
-            # Convert to millions for better display
-            team1_scores.append(team1_score / 1_000_000)
-            team2_scores.append(team2_score / 1_000_000)
+            avg_points = team.get("avg_points")
+            score = (team_users * avg_points / 1_000_000) if (team_users and avg_points) else 0
+            scores[key].append(score)
 
-        # Create the plot with one or two subplots based on include_team_balance setting
-        if include_team_balance:
-            fig, (ax1, ax3) = plt.subplots(2, 1, figsize=(12, 12), height_ratios=[1, 1])
-            ax2 = ax1.twinx()  # Create second y-axis for first subplot
-            ax4 = ax3.twinx()  # Create second y-axis for second subplot
-        else:
-            fig, ax1 = plt.subplots(1, 1, figsize=(12, 8))
-            ax2 = ax1.twinx()  # Create second y-axis for first subplot
+    return {
+        "fetched_times": fetched_times,
+        "leader_keys": leader_keys,
+        "team_keys": team_keys,
+        "percentages": percentages,
+        "users": users,
+        "scores": scores,
+    }
 
-        # Get team colors from config
-        team1_color = "#ff6b6b"  # Default red
-        team2_color = "#4ecdc4"  # Default teal
-        
-        if settings.teams:
-            team1_color = settings.teams.team1.color
-            team2_color = settings.teams.team2.color
 
-        # Plot team scores on the secondary y-axis (behind the percentage line)
-        if any(score > 0 for score in team1_scores + team2_scores):
-            ax2.plot(fetched_times, team1_scores, color=team1_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team1_name} Score', zorder=1)
-            ax2.plot(fetched_times, team2_scores, color=team2_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team2_name} Score', zorder=1)
+def _render_team_standings_figure(data: dict, include_team_balance: bool):
+    """Build the matplotlib Figure for team standings. Caller closes it."""
+    import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
 
-            # Set y-axis limits for scores (0 to 10% more than max score)
-            max_score = max(max(team1_scores), max(team2_scores))
-            if max_score > 0:
-                ax2.set_ylim(0, max_score * 1.1)
-                ax2.set_ylabel('Team Scores (Millions)', fontsize=10, color='gray')
-                ax2.tick_params(axis='y', labelcolor='gray')
+    team_keys = data["team_keys"]
+    fetched_times = data["fetched_times"]
+    percentages = data["percentages"]
+    scores = data["scores"]
+    users = data["users"]
+    leader_keys = data["leader_keys"]
 
-        # Plot team percentages over time on primary y-axis
-        ax1.plot(fetched_times, team1_percentages, 'b-', linewidth=2, label=f'{team1_name} %', zorder=3)
+    names_colors = {key: _team_display(key, i) for i, key in enumerate(team_keys)}
 
-        # Add a horizontal line at 50% to show the center
+    if include_team_balance:
+        fig, (ax1, ax3) = plt.subplots(2, 1, figsize=(12, 12), height_ratios=[1, 1])
+        ax2 = ax1.twinx()
+        ax4 = ax3.twinx()
+    else:
+        fig, ax1 = plt.subplots(1, 1, figsize=(12, 8))
+        ax2 = ax1.twinx()
+
+    # Team scores on the secondary y-axis (behind the percentage lines)
+    any_scores = any(score > 0 for team_scores in scores.values() for score in team_scores)
+    if any_scores:
+        for key in team_keys:
+            name, color = names_colors[key]
+            ax2.plot(fetched_times, scores[key], color=color, linewidth=1.5, alpha=0.7,
+                      label=f'{name} Score', zorder=1)
+
+        max_score = max((max(team_scores) for team_scores in scores.values() if team_scores), default=0)
+        if max_score > 0:
+            ax2.set_ylim(0, max_score * 1.1)
+            ax2.set_ylabel('Team Scores (Millions)', fontsize=10, color='gray')
+            ax2.tick_params(axis='y', labelcolor='gray')
+
+    # Team percentages over time on the primary y-axis
+    all_percentages: list[float] = []
+    for key in team_keys:
+        name, color = names_colors[key]
+        ax1.plot(fetched_times, percentages[key], color=color, linewidth=2, label=f'{name} %', zorder=3)
+        all_percentages.extend(p for p in percentages[key] if p == p)  # filter NaN
+
+    # Only the classic 2-team case has a meaningful "center" line
+    if len(team_keys) == 2:
         ax1.axhline(y=50, color='gray', linestyle='--', alpha=0.7, label='Center (50%)', zorder=2)
 
-        # Highlight leader changes
-        leader_change_times = [fetched_times[i] for i in range(len(leader_changes)) if leader_changes[i]]
-        leader_change_percentages = [team1_percentages[i] for i in range(len(leader_changes)) if leader_changes[i]]
+    # Highlight leader changes: mark the leading team's percentage at the
+    # moment the lead changed.
+    leader_change_times = []
+    leader_change_values = []
+    previous_leader = None
+    for i, leader_key in enumerate(leader_keys):
+        if leader_key is not None and previous_leader is not None and leader_key != previous_leader:
+            value = percentages.get(leader_key, [None] * len(fetched_times))[i]
+            if value == value:  # not NaN
+                leader_change_times.append(fetched_times[i])
+                leader_change_values.append(value)
+        previous_leader = leader_key
 
-        if leader_change_times:
-            ax1.scatter(leader_change_times, leader_change_percentages,
-                       color='orange', s=100, zorder=5, label='Leader Change', marker='*')
+    if leader_change_times:
+        ax1.scatter(leader_change_times, leader_change_values,
+                    color='orange', s=100, zorder=5, label='Leader Change', marker='*')
 
-        # Format the primary y-axis (percentages)
-        ax1.set_ylabel('Percentage (%)', fontsize=12)
-        ax1.set_title(f'ArtFight Team Standings Over Time\n{team1_name} vs {team2_name}',
-                      fontsize=14, fontweight='bold')
-        ax1.grid(True, alpha=0.3, zorder=0)
+    ax1.set_ylabel('Percentage (%)', fontsize=12)
+    team_names = " vs ".join(names_colors[key][0] for key in team_keys)
+    ax1.set_title(f'ArtFight Team Standings Over Time\n{team_names}', fontsize=14, fontweight='bold')
+    ax1.grid(True, alpha=0.3, zorder=0)
 
-        # Calculate y-axis limits based on largest distance from 50%
-        differences = [abs(p - 50) for p in team1_percentages]
-        max_distance = max(differences)
+    if all_percentages:
+        y_min = max(0, min(all_percentages) - 5)
+        y_max = min(100, max(all_percentages) + 5)
+        if y_min < y_max:
+            ax1.set_ylim(y_min, y_max)
 
-        # Set min and max at 15% more than the largest distance from 50%
-        padding = max_distance * 0.15
-        y_min = max(0, 50 - max_distance - padding)
-        y_max = min(100, 50 + max_distance + padding)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+    ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
 
-        ax1.set_ylim(y_min, y_max)
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
 
-        # Format x-axis dates for first subplot
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-        ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
-        plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
+    if not include_team_balance:
+        ax1.set_xlabel('Time', fontsize=12)
 
-        # Combine legends from both axes for first subplot
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+    if include_team_balance:
+        for key in team_keys:
+            name, color = names_colors[key]
+            ax3.plot(fetched_times, users[key], color=color, linewidth=2, label=f'{name} Users', zorder=3)
 
-        # Add x-axis label for single plot mode
-        if not include_team_balance:
-            ax1.set_xlabel('Time', fontsize=12)
+        all_users = [u for team_users in users.values() for u in team_users]
+        if all_users:
+            max_users = max(all_users)
+            min_users = min(all_users)
+            padding = max((max_users - min_users) * 0.15, 1)
+            ax3.set_ylim(max(0, min_users - padding), max_users + padding)
 
-        # SECOND SUBPLOT: User differences and counts (only if include_team_balance is True)
-        if include_team_balance:
-            # Plot user difference on primary y-axis
-            ax3.plot(fetched_times, user_differences, color='purple', linewidth=2, label='User Difference (Team1 - Team2)', zorder=3)
-            
-            # Add horizontal line at 0 to show balance
-            ax3.axhline(y=0, color='gray', linestyle='--', alpha=0.7, label='Balance (0)', zorder=2)
+        ax3.set_ylabel('User Count', fontsize=12)
+        ax3.set_xlabel('Time', fontsize=12)
+        ax3.set_title('Team User Counts', fontsize=12, fontweight='bold')
+        ax3.grid(True, alpha=0.3, zorder=0)
+        ax4.set_visible(False)
 
-            # Plot individual team user counts on secondary y-axis
-            ax4.plot(fetched_times, team1_users_list, color=team1_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team1_name} Users', zorder=1)
-            ax4.plot(fetched_times, team2_users_list, color=team2_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team2_name} Users', zorder=1)
+        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+        ax3.xaxis.set_major_locator(mdates.AutoDateLocator())
+        plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45)
 
-            # Calculate y-axis limits for user difference (15% padding, can go below zero)
-            if user_differences:
-                max_diff = max(abs(min(user_differences)), abs(max(user_differences)))
-                padding = max_diff * 0.15
-                diff_y_min = min(user_differences) - padding
-                diff_y_max = max(user_differences) + padding
-                ax3.set_ylim(diff_y_min, diff_y_max)
+        lines3, labels3 = ax3.get_legend_handles_labels()
+        ax3.legend(lines3, labels3, loc='upper left')
 
-            # Calculate y-axis limits for user counts (15% padding, floor at 0)
-            if team1_users_list and team2_users_list:
-                max_users = max(max(team1_users_list), max(team2_users_list))
-                min_users = min(min(team1_users_list), min(team2_users_list))
-                padding = (max_users - min_users) * 0.15
-                users_y_min = max(0, min_users - padding)
-                users_y_max = max_users + padding
-                ax4.set_ylim(users_y_min, users_y_max)
+    plt.tight_layout()
+    return fig
 
-            # Format the second subplot
-            ax3.set_ylabel('User Difference', fontsize=12)
-            ax3.set_xlabel('Time', fontsize=12)
-            ax3.set_title('Team User Counts and Differences', fontsize=12, fontweight='bold')
-            ax3.grid(True, alpha=0.3, zorder=0)
-            ax4.set_ylabel('User Count', fontsize=10, color='gray')
-            ax4.tick_params(axis='y', labelcolor='gray')
 
-            # Format x-axis dates for second subplot
-            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-            ax3.xaxis.set_major_locator(mdates.AutoDateLocator())
-            plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45)
+def generate_team_standings_plot(db_path: Optional[Path] = None, include_team_balance: Optional[bool] = None) -> Optional[discord.File]:
+    """Generate a team standings plot and return it as a Discord file."""
+    try:
+        if include_team_balance is None:
+            include_team_balance = settings.discord_include_team_balance_plot
+        if db_path is None:
+            db_path = settings.db_path
 
-            # Combine legends from both axes for second subplot
-            lines3, labels3 = ax3.get_legend_handles_labels()
-            lines4, labels4 = ax4.get_legend_handles_labels()
-            ax3.legend(lines3 + lines4, labels3 + labels4, loc='upper left')
+        data = _load_standings_series(db_path)
+        if data is None:
+            return None
 
-        # Adjust layout
-        plt.tight_layout()
+        import matplotlib.pyplot as plt
+        fig = _render_team_standings_figure(data, include_team_balance)
 
-        # Save plot to bytes buffer
         buffer = io.BytesIO()
         fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
         buffer.seek(0)
-
-        # Close the figure to free memory
         plt.close(fig)
 
-        # Create Discord file
-        file = discord.File(buffer, filename="team_standings.png")
-
         logger.info("Team standings plot generated successfully")
-        return file
+        return discord.File(buffer, filename="team_standings.png")
 
     except ImportError:
         logger.warning("matplotlib not available for plotting")
@@ -245,224 +256,23 @@ def generate_team_standings_plot(team1_name: str, team2_name: str, db_path: Opti
         return None
 
 
-def save_team_standings_plot(output_path: Path, team1_name: str = "Team 1", team2_name: str = "Team 2", 
-                           db_path: Optional[Path] = None, include_team_balance: Optional[bool] = None) -> bool:
+def save_team_standings_plot(output_path: Path, db_path: Optional[Path] = None, include_team_balance: Optional[bool] = None) -> bool:
     """Generate and save a team standings plot to a file."""
     try:
-        # Import matplotlib here to avoid adding it as a main dependency
-        import sqlite3
-
-        import matplotlib.dates as mdates
-        import matplotlib.pyplot as plt
-
-        # Use provided include_team_balance or default from settings
         if include_team_balance is None:
             include_team_balance = settings.discord_include_team_balance_plot
-
-        # Use provided db_path or default from settings
         if db_path is None:
             db_path = settings.db_path
-            
-        if not db_path.exists():
-            logger.warning("Database file not found for plotting")
+
+        data = _load_standings_series(db_path)
+        if data is None:
             return False
 
-        # Fetch standings data
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        import matplotlib.pyplot as plt
+        fig = _render_team_standings_figure(data, include_team_balance)
 
-        cursor.execute("""
-            SELECT team1_percentage, fetched_at, leader_change,
-                   team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                   team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
-            FROM team_standings
-            ORDER BY fetched_at ASC
-        """)
-
-        data = cursor.fetchall()
-        conn.close()
-
-        if not data:
-            logger.warning("No team standings data found for plotting")
-            return False
-
-        # Parse the data
-        team1_percentages = []
-        team1_scores = []
-        team2_scores = []
-        team1_users_list = []
-        team2_users_list = []
-        user_differences = []
-        fetched_times = []
-        leader_changes = []
-
-        for row in data:
-            (team1_percentage, fetched_at_str, leader_change,
-             team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-             team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
-
-            # Parse the datetime string
-            try:
-                fetched_at = datetime.fromisoformat(fetched_at_str)
-            except ValueError:
-                # Try alternative format if needed
-                fetched_at = datetime.strptime(fetched_at_str, "%Y-%m-%d %H:%M:%S")
-
-            team1_percentages.append(team1_percentage)
-            fetched_times.append(fetched_at)
-            leader_changes.append(bool(leader_change))
-
-            # Store user counts
-            team1_users_list.append(team1_users or 0)
-            team2_users_list.append(team2_users or 0)
-            
-            # Calculate user difference (team1 - team2)
-            user_diff = (team1_users or 0) - (team2_users or 0)
-            user_differences.append(user_diff)
-
-            # Calculate team scores (total points = users * avg_points)
-            team1_score = team1_users * team1_avg_points if team1_users and team1_avg_points else 0
-            team2_score = team2_users * team2_avg_points if team2_users and team2_avg_points else 0
-            
-            # Convert to millions for better display
-            team1_scores.append(team1_score / 1_000_000)
-            team2_scores.append(team2_score / 1_000_000)
-
-        # Create the plot with one or two subplots based on include_team_balance setting
-        if include_team_balance:
-            fig, (ax1, ax3) = plt.subplots(2, 1, figsize=(12, 12), height_ratios=[1, 1])
-            ax2 = ax1.twinx()  # Create second y-axis for first subplot
-            ax4 = ax3.twinx()  # Create second y-axis for second subplot
-        else:
-            fig, ax1 = plt.subplots(1, 1, figsize=(12, 8))
-            ax2 = ax1.twinx()  # Create second y-axis for first subplot
-
-        # Get team colors from config
-        team1_color = "#ff6b6b"  # Default red
-        team2_color = "#4ecdc4"  # Default teal
-        
-        if settings.teams:
-            team1_color = settings.teams.team1.color
-            team2_color = settings.teams.team2.color
-
-        # Plot team scores on the secondary y-axis (behind the percentage line)
-        if any(score > 0 for score in team1_scores + team2_scores):
-            ax2.plot(fetched_times, team1_scores, color=team1_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team1_name} Score', zorder=1)
-            ax2.plot(fetched_times, team2_scores, color=team2_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team2_name} Score', zorder=1)
-
-            # Set y-axis limits for scores (0 to 10% more than max score)
-            max_score = max(max(team1_scores), max(team2_scores))
-            if max_score > 0:
-                ax2.set_ylim(0, max_score * 1.1)
-                ax2.set_ylabel('Team Scores (Millions)', fontsize=10, color='gray')
-                ax2.tick_params(axis='y', labelcolor='gray')
-
-        # Plot team percentages over time on primary y-axis
-        ax1.plot(fetched_times, team1_percentages, 'b-', linewidth=2, label=f'{team1_name} %', zorder=3)
-
-        # Add a horizontal line at 50% to show the center
-        ax1.axhline(y=50, color='gray', linestyle='--', alpha=0.7, label='Center (50%)', zorder=2)
-
-        # Highlight leader changes
-        leader_change_times = [fetched_times[i] for i in range(len(leader_changes)) if leader_changes[i]]
-        leader_change_percentages = [team1_percentages[i] for i in range(len(leader_changes)) if leader_changes[i]]
-
-        if leader_change_times:
-            ax1.scatter(leader_change_times, leader_change_percentages,
-                       color='orange', s=100, zorder=5, label='Leader Change', marker='*')
-
-        # Format the primary y-axis (percentages)
-        ax1.set_ylabel('Percentage (%)', fontsize=12)
-        ax1.set_title(f'ArtFight Team Standings Over Time\n{team1_name} vs {team2_name}',
-                      fontsize=14, fontweight='bold')
-        ax1.grid(True, alpha=0.3, zorder=0)
-
-        # Calculate y-axis limits based on largest distance from 50%
-        differences = [abs(p - 50) for p in team1_percentages]
-        max_distance = max(differences)
-
-        # Set min and max at 15% more than the largest distance from 50%
-        padding = max_distance * 0.15
-        y_min = max(0, 50 - max_distance - padding)
-        y_max = min(100, 50 + max_distance + padding)
-
-        ax1.set_ylim(y_min, y_max)
-
-        # Format x-axis dates for first subplot
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-        ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
-        plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
-
-        # Combine legends from both axes for first subplot
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
-
-        # Add x-axis label for single plot mode
-        if not include_team_balance:
-            ax1.set_xlabel('Time', fontsize=12)
-
-        # SECOND SUBPLOT: User differences and counts (only if include_team_balance is True)
-        if include_team_balance:
-            # Plot user difference on primary y-axis
-            ax3.plot(fetched_times, user_differences, color='purple', linewidth=2, label='User Difference (Team1 - Team2)', zorder=3)
-            
-            # Add horizontal line at 0 to show balance
-            ax3.axhline(y=0, color='gray', linestyle='--', alpha=0.7, label='Balance (0)', zorder=2)
-
-            # Plot individual team user counts on secondary y-axis
-            ax4.plot(fetched_times, team1_users_list, color=team1_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team1_name} Users', zorder=1)
-            ax4.plot(fetched_times, team2_users_list, color=team2_color, linewidth=1.5, alpha=0.7, 
-                    label=f'{team2_name} Users', zorder=1)
-
-            # Calculate y-axis limits for user difference (15% padding, can go below zero)
-            if user_differences:
-                max_diff = max(abs(min(user_differences)), abs(max(user_differences)))
-                padding = max_diff * 0.15
-                diff_y_min = min(user_differences) - padding
-                diff_y_max = max(user_differences) + padding
-                ax3.set_ylim(diff_y_min, diff_y_max)
-
-            # Calculate y-axis limits for user counts (15% padding, floor at 0)
-            if team1_users_list and team2_users_list:
-                max_users = max(max(team1_users_list), max(team2_users_list))
-                min_users = min(min(team1_users_list), min(team2_users_list))
-                padding = (max_users - min_users) * 0.15
-                users_y_min = max(0, min_users - padding)
-                users_y_max = max_users + padding
-                ax4.set_ylim(users_y_min, users_y_max)
-
-            # Format the second subplot
-            ax3.set_ylabel('User Difference', fontsize=12)
-            ax3.set_xlabel('Time', fontsize=12)
-            ax3.set_title('Team User Counts and Differences', fontsize=12, fontweight='bold')
-            ax3.grid(True, alpha=0.3, zorder=0)
-            ax4.set_ylabel('User Count', fontsize=10, color='gray')
-            ax4.tick_params(axis='y', labelcolor='gray')
-
-            # Format x-axis dates for second subplot
-            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-            ax3.xaxis.set_major_locator(mdates.AutoDateLocator())
-            plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45)
-
-            # Combine legends from both axes for second subplot
-            lines3, labels3 = ax3.get_legend_handles_labels()
-            lines4, labels4 = ax4.get_legend_handles_labels()
-            ax3.legend(lines3 + lines4, labels3 + labels4, loc='upper left')
-
-        # Adjust layout
-        plt.tight_layout()
-
-        # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Save plot to file
         fig.savefig(output_path, format='png', dpi=150, bbox_inches='tight')
-
-        # Close the figure to free memory
         plt.close(fig)
 
         logger.info(f"Team standings plot saved to {output_path}")
@@ -473,4 +283,4 @@ def save_team_standings_plot(output_path: Path, team1_name: str = "Team 1", team
         return False
     except Exception as e:
         logger.error(f"Failed to generate team standings plot: {e}")
-        return False 
+        return False

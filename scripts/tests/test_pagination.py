@@ -26,7 +26,7 @@ async def test_pagination():
 
     try:
         # Test with a known username
-        username = "fourleafisland"
+        username = "cupidcry"
 
         print(f"\n📋 Testing pagination for user: {username}")
         print(f"  Page delay: {settings.page_request_delay_sec}s")

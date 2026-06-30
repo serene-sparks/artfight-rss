@@ -39,7 +39,7 @@ async def test_defense_parsing():
 
     try:
         # Test with a known username (you'll need to replace with a real one)
-        username = "fourleafisland"  # Replace with a real ArtFight username
+        username = "cupidcry"  # Replace with a real ArtFight username
 
         print(f"Fetching defenses for user: {username}")
 

@@ -26,6 +26,13 @@ from .plotting import generate_team_standings_plot
 logger = get_logger(__name__)
 
 
+def _all_team_names() -> list[str]:
+    """Return the configured team names in order, or generic fallbacks."""
+    if settings.teams:
+        return [team.name for _key, team in settings.teams.items()]
+    return ["Team 1", "Team 2"]
+
+
 class ArtFightDiscordBot:
     """Discord bot for ArtFight notifications and commands."""
 
@@ -390,13 +397,12 @@ class ArtFightDiscordBot:
 
     async def _handle_plot_command(self, interaction: discord.Interaction, include_team_balance: bool | None):
         """Handle the plot command."""
-        team1_name = settings.teams.team1.name if settings.teams else "Team 1"
-        team2_name = settings.teams.team2.name if settings.teams else "Team 2"
+        team_names = _all_team_names()
 
         # Create embed for the plot
         embed = discord.Embed(
             title="📊 Team Standings Plot",
-            description=f"Generated plot for {team1_name} vs {team2_name}",
+            description=f"Generated plot for {' vs '.join(team_names)}",
             color=0x0099ff,
             timestamp=datetime.now(UTC)
         )
@@ -419,7 +425,7 @@ class ArtFightDiscordBot:
 
         # Generate the plot
         try:
-            plot_file = await self._generate_team_standings_plot(team1_name, team2_name, include_team_balance=include_team_balance)
+            plot_file = await self._generate_team_standings_plot(include_team_balance=include_team_balance)
             if plot_file:
                 await self._send_embed_with_file(embed, plot_file, "team_standings.png")
             else:
@@ -707,19 +713,76 @@ class ArtFightDiscordBot:
             logger.warning(f"Failed to generate visual diff: {e}")
             return None
 
+    def _team_name(self, team_key: str) -> str:
+        if settings.teams is not None:
+            try:
+                return settings.teams[team_key].name
+            except (KeyError, AttributeError):
+                pass
+        return team_key
+
+    def _team_color_int(self, team_key: str, fallback: int) -> int:
+        if settings.teams is not None:
+            try:
+                return int(settings.teams[team_key].color.replace("#", ""), 16)
+            except (KeyError, AttributeError, ValueError):
+                pass
+        return fallback
+
+    def _team_image_url(self, team_key: str | None) -> str | None:
+        if settings.teams is not None and team_key is not None:
+            try:
+                return settings.teams[team_key].image_url
+            except (KeyError, AttributeError):
+                pass
+        return None
+
+    def _add_standing_fields(self, embed: discord.Embed, standing: TeamStanding) -> None:
+        """Add per-team percentage and detailed metric fields to an embed."""
+        percentages = standing.percentages()
+        team_data = standing.get_team_data()
+
+        for team_key, percentage in percentages.items():
+            embed.add_field(
+                name=self._team_name(team_key),
+                value=f"{percentage:.5f}%",
+                inline=True
+            )
+
+        metric_specs = [
+            ("users", "👥 **Users**", "{:,}"),
+            ("attacks", "⚔️ **Attacks**", "{:,}"),
+            ("friendly_fire", "🔥 **Friendly Fire**", "{:,}"),
+            ("battle_ratio", "⚖️ **Battle Ratio**", "{:.2f}%"),
+            ("avg_points", "📊 **Avg Points**", "{:.2f}"),
+            ("avg_attacks", "🎯 **Avg Attacks**", "{:.2f}"),
+        ]
+        metrics_lines = []
+        for metric_key, label, fmt in metric_specs:
+            values = [
+                (self._team_name(key), team.get(metric_key))
+                for key, team in team_data.items()
+                if team.get(metric_key) is not None
+            ]
+            if values:
+                formatted = " | ".join(fmt.format(value) for _name, value in values)
+                metrics_lines.append(f"{label}: {formatted}")
+
+        if metrics_lines:
+            embed.add_field(
+                name="📈 Detailed Metrics",
+                value="\n".join(metrics_lines),
+                inline=False
+            )
+
     async def send_team_standing_notification(self, standing: TeamStanding):
         """Send a Discord notification for team standing changes."""
         if not settings.discord_notify_team_changes or not self.running:
             return
 
-        team1_name = settings.teams.team1.name if settings.teams else "Team 1"
-        team2_name = settings.teams.team2.name if settings.teams else "Team 2"
-        team1_color = int(settings.teams.team1.color.replace("#", ""), 16) if settings.teams else 0xff6b6b
-        team2_color = int(settings.teams.team2.color.replace("#", ""), 16) if settings.teams else 0x4ecdc4
-
-        # Determine which team is leading
-        leading_team = team1_name if standing.team1_percentage > 50 else team2_name
-        leading_color = team1_color if standing.team1_percentage > 50 else team2_color
+        leader_key = standing.leader_key or standing.compute_leader_key()
+        leading_team = self._team_name(leader_key) if leader_key else "Unknown"
+        leading_color = self._team_color_int(leader_key, 0xff6b6b) if leader_key else 0xff6b6b
 
         embed = discord.Embed(
             title="🏆 Team Standings Update",
@@ -728,51 +791,17 @@ class ArtFightDiscordBot:
             timestamp=standing.fetched_at
         )
 
-        embed.add_field(
-            name=team1_name,
-            value=f"{standing.team1_percentage:.5f}%",
-            inline=True
-        )
-        embed.add_field(
-            name=team2_name,
-            value=f"{100 - standing.team1_percentage:.5f}%",
-            inline=True
-        )
+        self._add_standing_fields(embed, standing)
 
-        # Add detailed metrics if available
-        if any([standing.team1_users, standing.team1_attacks, standing.team1_friendly_fire,
-                standing.team2_users, standing.team2_attacks, standing.team2_friendly_fire]):
-
-            # Create detailed metrics field
-            metrics_lines = []
-            if standing.team1_users and standing.team2_users:
-                metrics_lines.append(f"👥 **Users**: {standing.team1_users:,} | {standing.team2_users:,}")
-            if standing.team1_attacks and standing.team2_attacks:
-                metrics_lines.append(f"⚔️ **Attacks**: {standing.team1_attacks:,} | {standing.team2_attacks:,}")
-            if standing.team1_friendly_fire and standing.team2_friendly_fire:
-                metrics_lines.append(f"🔥 **Friendly Fire**: {standing.team1_friendly_fire:,} | {standing.team2_friendly_fire:,}")
-            if standing.team1_battle_ratio and standing.team2_battle_ratio:
-                metrics_lines.append(f"⚖️ **Battle Ratio**: {standing.team1_battle_ratio:.2f}% | {standing.team2_battle_ratio:.2f}%")
-            if standing.team1_avg_points and standing.team2_avg_points:
-                metrics_lines.append(f"📊 **Avg Points**: {standing.team1_avg_points:.2f} | {standing.team2_avg_points:.2f}")
-            if standing.team1_avg_attacks and standing.team2_avg_attacks:
-                metrics_lines.append(f"🎯 **Avg Attacks**: {standing.team1_avg_attacks:.2f} | {standing.team2_avg_attacks:.2f}")
-
-            if metrics_lines:
-                embed.add_field(
-                    name="📈 Detailed Metrics",
-                    value="\n".join(metrics_lines),
-                    inline=False
-                )
-
-        if settings.teams:
-            embed.set_thumbnail(url=settings.teams.team1.image_url if standing.team1_percentage > 50 else settings.teams.team2.image_url)
+        thumbnail = self._team_image_url(leader_key)
+        if thumbnail:
+            embed.set_thumbnail(url=thumbnail)
 
         embed.set_footer(text="ArtFight Bot", icon_url="https://artfight.net/favicon.ico")
 
         # Generate and attach team standings plot
         try:
-            plot_file = await self._generate_team_standings_plot(team1_name, team2_name, include_team_balance=settings.discord_include_team_balance_plot)
+            plot_file = await self._generate_team_standings_plot(include_team_balance=settings.discord_include_team_balance_plot)
             if plot_file:
                 await self._send_embed_with_file(embed, plot_file, "team_standings.png")
             else:
@@ -786,14 +815,9 @@ class ArtFightDiscordBot:
         if not settings.discord_notify_leader_changes or not self.running:
             return
 
-        team1_name = settings.teams.team1.name if settings.teams else "Team 1"
-        team2_name = settings.teams.team2.name if settings.teams else "Team 2"
-        team1_color = int(settings.teams.team1.color.replace("#", ""), 16) if settings.teams else 0xff6b6b
-        team2_color = int(settings.teams.team2.color.replace("#", ""), 16) if settings.teams else 0x4ecdc4
-
-        # Determine which team is now leading
-        new_leader = team1_name if standing.team1_percentage > 50 else team2_name
-        leader_color = team1_color if standing.team1_percentage > 50 else team2_color
+        leader_key = standing.leader_key or standing.compute_leader_key()
+        new_leader = self._team_name(leader_key) if leader_key else "Unknown"
+        leader_color = self._team_color_int(leader_key, 0xff6b6b) if leader_key else 0xff6b6b
 
         embed = discord.Embed(
             title="👑 LEADER CHANGE!",
@@ -802,45 +826,11 @@ class ArtFightDiscordBot:
             timestamp=standing.fetched_at
         )
 
-        embed.add_field(
-            name=team1_name,
-            value=f"{standing.team1_percentage:.5f}%",
-            inline=True
-        )
-        embed.add_field(
-            name=team2_name,
-            value=f"{100 - standing.team1_percentage:.5f}%",
-            inline=True
-        )
+        self._add_standing_fields(embed, standing)
 
-        # Add detailed metrics if available
-        if any([standing.team1_users, standing.team1_attacks, standing.team1_friendly_fire,
-                standing.team2_users, standing.team2_attacks, standing.team2_friendly_fire]):
-
-            # Create detailed metrics field
-            metrics_lines = []
-            if standing.team1_users and standing.team2_users:
-                metrics_lines.append(f"👥 **Users**: {standing.team1_users:,} | {standing.team2_users:,}")
-            if standing.team1_attacks and standing.team2_attacks:
-                metrics_lines.append(f"⚔️ **Attacks**: {standing.team1_attacks:,} | {standing.team2_attacks:,}")
-            if standing.team1_friendly_fire and standing.team2_friendly_fire:
-                metrics_lines.append(f"🔥 **Friendly Fire**: {standing.team1_friendly_fire:,} | {standing.team2_friendly_fire:,}")
-            if standing.team1_battle_ratio and standing.team2_battle_ratio:
-                metrics_lines.append(f"⚖️ **Battle Ratio**: {standing.team1_battle_ratio:.2f}% | {standing.team2_battle_ratio:.2f}%")
-            if standing.team1_avg_points and standing.team2_avg_points:
-                metrics_lines.append(f"📊 **Avg Points**: {standing.team1_avg_points:.2f} | {standing.team2_avg_points:.2f}")
-            if standing.team1_avg_attacks and standing.team2_avg_attacks:
-                metrics_lines.append(f"🎯 **Avg Attacks**: {standing.team1_avg_attacks:.2f} | {standing.team2_avg_attacks:.2f}")
-
-            if metrics_lines:
-                embed.add_field(
-                    name="📈 Detailed Metrics",
-                    value="\n".join(metrics_lines),
-                    inline=False
-                )
-
-        if settings.teams:
-            embed.set_thumbnail(url=settings.teams.team1.image_url if standing.team1_percentage > 50 else settings.teams.team2.image_url)
+        thumbnail = self._team_image_url(leader_key)
+        if thumbnail:
+            embed.set_thumbnail(url=thumbnail)
 
         embed.set_footer(text="ArtFight Bot", icon_url="https://artfight.net/favicon.ico")
 
@@ -1019,10 +1009,12 @@ class ArtFightDiscordBot:
         )
 
         if settings.teams:
+            teams_value = "\n".join(
+                f"**{team.name}** ({key})" for key, team in settings.teams.items()
+            )
             embed.add_field(
                 name="Teams",
-                value=f"**{settings.teams.team1.name}** (Team 1)\n"
-                      f"**{settings.teams.team2.name}** (Team 2)",
+                value=teams_value,
                 inline=False
             )
         else:
@@ -1066,9 +1058,9 @@ class ArtFightDiscordBot:
         except Exception as e:
             logger.error(f"Failed to send Discord message with file: {e}")
 
-    async def _generate_team_standings_plot(self, team1_name: str, team2_name: str, include_team_balance: bool | None = None) -> discord.File | None:
+    async def _generate_team_standings_plot(self, include_team_balance: bool | None = None) -> discord.File | None:
         """Generate a team standings plot and return it as a Discord file."""
-        return generate_team_standings_plot(team1_name, team2_name, include_team_balance=include_team_balance)
+        return generate_team_standings_plot(include_team_balance=include_team_balance)
 
     def is_running(self) -> bool:
         """Check if the Discord bot is running."""

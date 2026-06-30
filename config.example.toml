@@ -22,7 +22,7 @@ debug = false
 max_users_per_feed = 5  # Maximum number of users allowed in a single multiuser feed
 max_feed_items = 50     # Maximum number of items returned in a feed
 
-# Whitelist of supported ArtFight profiles (optional)
+# Allowlist of supported ArtFight profiles (optional)
 # If empty, all profiles are allowed
 whitelist = [
     "example_user"
@@ -49,5 +49,9 @@ monitor_list = [
 ]
 
 [teams]
+# Any number of teams is supported (team1, team2, team3, ...). ArtFight has
+# used 2 teams in most years and 3 teams in 2026 - just add/remove entries
+# here to match the current event.
 team1 = { name = "Fossils", color = "#BA8C25", image_url = "https://images.artfight.net/2025/2025_Fossils.png" }
 team2 = { name = "Crystals", color = "#D35E88", image_url = "https://images.artfight.net/2025/2025_Crystals.png" }
+# team3 = { name = "Example", color = "#2E86AB", image_url = "https://images.artfight.net/2026/2026_Example.png" }

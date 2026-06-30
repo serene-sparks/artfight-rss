@@ -538,11 +538,14 @@ class ArtFightDatabase:
             if team_count > 0:
                 # Get latest standing
                 latest = conn.execute("""
-                    SELECT team1_percentage, fetched_at FROM team_standings
+                    SELECT team_data, fetched_at FROM team_standings
                     ORDER BY fetched_at DESC LIMIT 1
                 """).fetchone()
                 if latest:
-                    team_stats["latest_team1_percentage"] = latest[0]
+                    team_stats["latest_percentages"] = {
+                        key: team.get("percentage")
+                        for key, team in json.loads(latest[0] or "{}").items()
+                    }
                     team_stats["latest_fetched_at"] = latest[1]
 
                 # Get leader change count
@@ -582,68 +585,65 @@ class ArtFightDatabase:
         now = datetime.now(UTC).isoformat()
 
         with sqlite3.connect(self.db_path) as conn:
-            # Get previous team1 percentage to detect leader changes
+            # Get previous leader to detect leader changes
             cursor = conn.execute("""
-                SELECT team1_percentage FROM team_standings
+                SELECT leader_key FROM team_standings
                 ORDER BY fetched_at DESC
                 LIMIT 1
             """)
             previous_row = cursor.fetchone()
+            previous_leader_key = previous_row[0] if previous_row else None
 
-            # Determine if there's a leader change
-            leader_change = False
-            if previous_row and standings:
-                previous_team1_percentage = previous_row[0]
-                current_team1_percentage = standings[0].team1_percentage
+            standing = standings[0]  # Only one standing now
+            current_leader_key = standing.leader_key or standing.compute_leader_key()
+            standing.leader_key = current_leader_key
 
-                # Leader change occurs when team1 percentage crosses 50%
-                previous_leader_team1 = previous_team1_percentage > 50.0
-                current_leader_team1 = current_team1_percentage > 50.0
-                leader_change = previous_leader_team1 != current_leader_team1
+            # Determine if there's a leader change (only meaningful once we have a prior leader)
+            leader_change = bool(
+                previous_row is not None
+                and previous_leader_key is not None
+                and current_leader_key is not None
+                and previous_leader_key != current_leader_key
+            )
+            standing.leader_change = leader_change
 
-            # Insert new standing (don't delete previous ones)
-            if standings:
-                standing = standings[0]  # Only one standing now
-                # Set leader_change flag if this is a leader change
-                standing.leader_change = leader_change
-
-                conn.execute("""
-                    INSERT INTO team_standings
-                    (team1_percentage, fetched_at, leader_change, first_seen, last_updated,
-                     team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                     team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    standing.team1_percentage,
-                    standing.fetched_at.isoformat(),
-                    1 if standing.leader_change else 0,  # SQLite boolean as integer
-                    now,  # first_seen
-                    now,  # last_updated
-                    standing.team1_users,
-                    standing.team1_attacks,
-                    standing.team1_friendly_fire,
-                    standing.team1_battle_ratio,
-                    standing.team1_avg_points,
-                    standing.team1_avg_attacks,
-                    standing.team2_users,
-                    standing.team2_attacks,
-                    standing.team2_friendly_fire,
-                    standing.team2_battle_ratio,
-                    standing.team2_avg_points,
-                    standing.team2_avg_attacks
-                ))
+            conn.execute("""
+                INSERT INTO team_standings
+                (team_data, leader_key, fetched_at, leader_change, first_seen, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                standing.team_data,
+                standing.leader_key,
+                standing.fetched_at.isoformat(),
+                1 if standing.leader_change else 0,  # SQLite boolean as integer
+                now,  # first_seen
+                now,  # last_updated
+            ))
             conn.commit()
 
             if leader_change:
-                team1_name = "Team 1"
-                team2_name = "Team 2"
-                # Get team names from config if available
-                if settings.teams:
-                    team1_name = settings.teams.team1.name
-                    team2_name = settings.teams.team2.name
+                team_name = current_leader_key
+                if settings.teams is not None and current_leader_key is not None:
+                    try:
+                        team_name = settings.teams[current_leader_key].name
+                    except (KeyError, AttributeError):
+                        pass
+                print(f"🚨 Leader change detected! New leader: {team_name}")
 
-                new_leader = team1_name if current_team1_percentage > 50.0 else team2_name
-                print(f"🚨 Leader change detected! New leader: {new_leader}")
+    def _row_to_team_standing(self, row: tuple) -> TeamStanding:
+        """Convert a (team_data, leader_key, fetched_at, leader_change) row into a TeamStanding."""
+        team_data, leader_key, fetched_at, leader_change = row
+        fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
+
+        standing = TeamStanding(
+            team_data=team_data or "{}",
+            leader_key=leader_key,
+            fetched_at=fetched_at_dt,
+            leader_change=bool(leader_change),
+            first_seen=fetched_at_dt,
+            last_updated=fetched_at_dt,
+        )
+        return standing
 
     def get_team_standings(self) -> list[TeamStanding]:
         """Get current team standings."""
@@ -653,9 +653,7 @@ class ArtFightDatabase:
         """Get the most recent team standings."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("""
-                SELECT team1_percentage, fetched_at, leader_change,
-                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
+                SELECT team_data, leader_key, fetched_at, leader_change
                 FROM team_standings
                 ORDER BY fetched_at DESC
                 LIMIT 1
@@ -663,33 +661,7 @@ class ArtFightDatabase:
             row = cursor.fetchone()
 
             if row:
-                (team1_percentage, fetched_at, leader_change,
-                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
-
-                # Parse datetime and ensure timezone awareness
-                fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
-
-                standing = TeamStanding(
-                    team1_percentage=team1_percentage,
-                    fetched_at=fetched_at_dt,
-                    leader_change=bool(leader_change),
-                    first_seen=fetched_at_dt,
-                    last_updated=fetched_at_dt,
-                    team1_users=team1_users,
-                    team1_attacks=team1_attacks,
-                    team1_friendly_fire=team1_friendly_fire,
-                    team1_battle_ratio=team1_battle_ratio,
-                    team1_avg_points=team1_avg_points,
-                    team1_avg_attacks=team1_avg_attacks,
-                    team2_users=team2_users,
-                    team2_attacks=team2_attacks,
-                    team2_friendly_fire=team2_friendly_fire,
-                    team2_battle_ratio=team2_battle_ratio,
-                    team2_avg_points=team2_avg_points,
-                    team2_avg_attacks=team2_avg_attacks
-                )
-                return [standing]
+                return [self._row_to_team_standing(row)]
 
             return []
 
@@ -700,9 +672,7 @@ class ArtFightDatabase:
 
         with sqlite3.connect(self.db_path) as conn:
             query = """
-                SELECT team1_percentage, fetched_at, leader_change,
-                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
+                SELECT team_data, leader_key, fetched_at, leader_change
                 FROM team_standings
                 ORDER BY fetched_at DESC
             """
@@ -713,37 +683,7 @@ class ArtFightDatabase:
             cursor = conn.execute(query)
             rows = cursor.fetchall()
 
-            standings = []
-            for row in rows:
-                (team1_percentage, fetched_at, leader_change,
-                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
-
-                # Parse datetime and ensure timezone awareness
-                fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
-
-                standing = TeamStanding(
-                    team1_percentage=team1_percentage,
-                    fetched_at=fetched_at_dt,
-                    leader_change=bool(leader_change),
-                    first_seen=fetched_at_dt,
-                    last_updated=fetched_at_dt,
-                    team1_users=team1_users,
-                    team1_attacks=team1_attacks,
-                    team1_friendly_fire=team1_friendly_fire,
-                    team1_battle_ratio=team1_battle_ratio,
-                    team1_avg_points=team1_avg_points,
-                    team1_avg_attacks=team1_avg_attacks,
-                    team2_users=team2_users,
-                    team2_attacks=team2_attacks,
-                    team2_friendly_fire=team2_friendly_fire,
-                    team2_battle_ratio=team2_battle_ratio,
-                    team2_avg_points=team2_avg_points,
-                    team2_avg_attacks=team2_avg_attacks
-                )
-                standings.append(standing)
-
-            return standings
+            return [self._row_to_team_standing(row) for row in rows]
 
     def get_team_standing_changes(self, days: int = 30, limit: int | None = None) -> list[TeamStanding]:
         """Get team standing changes for RSS feed: last update of each day and all leader changes."""
@@ -756,41 +696,13 @@ class ArtFightDatabase:
 
             # Get all standings from the last N days
             cursor = conn.execute("""
-                SELECT team1_percentage, fetched_at, leader_change,
-                       team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                       team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks
+                SELECT team_data, leader_key, fetched_at, leader_change
                 FROM team_standings
                 WHERE fetched_at >= ?
                 ORDER BY fetched_at DESC
             """, (cutoff_date,))
 
-            all_standings = []
-            for row in cursor.fetchall():
-                (team1_percentage, fetched_at, leader_change,
-                 team1_users, team1_attacks, team1_friendly_fire, team1_battle_ratio, team1_avg_points, team1_avg_attacks,
-                 team2_users, team2_attacks, team2_friendly_fire, team2_battle_ratio, team2_avg_points, team2_avg_attacks) = row
-                fetched_at_dt = ensure_timezone_aware(datetime.fromisoformat(fetched_at))
-
-                standing = TeamStanding(
-                    team1_percentage=team1_percentage,
-                    fetched_at=fetched_at_dt,
-                    leader_change=bool(leader_change),
-                    first_seen=fetched_at_dt,
-                    last_updated=fetched_at_dt,
-                    team1_users=team1_users,
-                    team1_attacks=team1_attacks,
-                    team1_friendly_fire=team1_friendly_fire,
-                    team1_battle_ratio=team1_battle_ratio,
-                    team1_avg_points=team1_avg_points,
-                    team1_avg_attacks=team1_avg_attacks,
-                    team2_users=team2_users,
-                    team2_attacks=team2_attacks,
-                    team2_friendly_fire=team2_friendly_fire,
-                    team2_battle_ratio=team2_battle_ratio,
-                    team2_avg_points=team2_avg_points,
-                    team2_avg_attacks=team2_avg_attacks
-                )
-                all_standings.append(standing)
+            all_standings = [self._row_to_team_standing(row) for row in cursor.fetchall()]
 
             if not all_standings:
                 return []

@@ -43,7 +43,7 @@ def debug_whitelist():
 
     # Test whitelist functionality
     print("\n🧪 Whitelist Test:")
-    test_user = "fourleafisland"
+    test_user = "cupidcry"
     if settings.whitelist:
         if test_user in settings.whitelist:
             print(f"  ✅ '{test_user}' is in whitelist")

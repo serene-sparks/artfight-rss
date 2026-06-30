@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, RootModel, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -25,11 +25,43 @@ class TeamConfig(BaseModel):
     image_url: str = Field(..., description="Team image URL for RSS feeds")
 
 
-class TeamSettings(BaseModel):
-    """Configuration for the two ArtFight teams."""
+class TeamSettings(RootModel[dict[str, TeamConfig]]):
+    """Configuration for the ArtFight teams.
 
-    team1: TeamConfig = Field(..., description="First team configuration")
-    team2: TeamConfig = Field(..., description="Second team configuration")
+    Supports any number of teams (ArtFight has used 2 teams in past years and
+    3 teams in 2026). Teams are configured in `config.toml` as `team1`,
+    `team2`, `team3`, etc. and are kept in declaration order.
+    """
+
+    def __getattr__(self, item: str) -> TeamConfig:
+        # Preserve the old `settings.teams.team1` style attribute access.
+        try:
+            return self.root[item]
+        except KeyError as exc:
+            raise AttributeError(item) from exc
+
+    def __getitem__(self, item: str) -> TeamConfig:
+        return self.root[item]
+
+    def __iter__(self):  # type: ignore[override]
+        return iter(self.root.items())
+
+    def __len__(self) -> int:
+        return len(self.root)
+
+    def keys(self):
+        return self.root.keys()
+
+    def values(self):
+        return self.root.values()
+
+    def items(self):
+        return self.root.items()
+
+    @property
+    def count(self) -> int:
+        """Number of configured teams."""
+        return len(self.root)
 
 
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
@@ -61,7 +93,8 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
             return value
         elif field_name == "teams" and isinstance(value, dict):
             # Handle teams configuration - convert to TeamSettings object
-            return TeamSettings(**value)
+            # (supports any number of teams: team1, team2, team3, ...)
+            return TeamSettings(value)
         elif field_name == "whitelist" and isinstance(value, list):
             # Handle whitelist
             return value
@@ -96,8 +129,9 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
                             print(f"  Processed {len(value)} monitored users")
                         elif key == "teams":
                             # Handle teams configuration - convert to TeamSettings object
-                            processed_data["teams"] = TeamSettings(**value)
-                            print("  Processed teams configuration")
+                            # (supports any number of teams: team1, team2, team3, ...)
+                            processed_data["teams"] = TeamSettings(value)
+                            print(f"  Processed teams configuration ({len(value)} teams)")
                         elif key == "whitelist":
                             # Handle whitelist
                             processed_data["whitelist"] = value
@@ -196,7 +230,7 @@ class Settings(BaseSettings):
     # Team configuration
     teams: TeamSettings | None = Field(
         default=None,
-        description="Configuration for the two ArtFight teams"
+        description="Configuration for the ArtFight teams (any number supported)"
     )
 
     @field_validator('whitelist', mode='before')

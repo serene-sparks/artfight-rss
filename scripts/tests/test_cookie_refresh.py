@@ -46,7 +46,7 @@ async def test_cookie_refresh():
         print(f"  CF clearance: {auth_info['current_cookies']['cf_clearance']}")
 
         # Test with a known username
-        username = "fourleafisland"
+        username = "cupidcry"
 
         print(f"\nTesting attacks for user: {username}")
         print("-" * 40)

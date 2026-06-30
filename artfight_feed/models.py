@@ -67,81 +67,134 @@ class ArtFightDefense(SQLModel, table=True):
 
 
 class TeamStanding(SQLModel, table=True):
-    """Represents a team standing update."""
+    """Represents a team standing update.
+
+    Supports any number of teams (ArtFight has run events with 2 teams in
+    past years and 3 teams in 2026). Per-team data (percentage and detailed
+    metrics) is stored as a JSON blob keyed by the team's config key
+    (e.g. "team1", "team2", "team3", ...) so the schema doesn't need to
+    change if the number of teams changes again.
+    """
 
     __tablename__ = "team_standings" # type: ignore
 
     id: int | None = SQLField(default=None, primary_key=True, description="Primary key")
-    team1_percentage: float = SQLField(description="Percentage of team 1 (0.0-100.0)")
+    team_data: str = SQLField(
+        default="{}",
+        description=(
+            "JSON object keyed by team config key (team1, team2, ...) with "
+            "per-team percentage and metrics, e.g. "
+            '{"team1": {"percentage": 55.2, "users": 100, ...}, "team2": {...}}'
+        ),
+    )
+    leader_key: str | None = SQLField(default=None, description="Config key of the currently leading team")
     fetched_at: datetime = SQLField(description="When the standing was first fetched")
     leader_change: bool = SQLField(default=False, description="Whether this represents a leader change")
     first_seen: datetime = SQLField(description="When this standing was first seen")
     last_updated: datetime = SQLField(description="When this standing was last updated")
-    
-    # Additional team metrics
-    team1_users: int | None = SQLField(default=None, description="Number of users on team 1")
-    team1_attacks: int | None = SQLField(default=None, description="Number of attacks by team 1")
-    team1_friendly_fire: int | None = SQLField(default=None, description="Number of friendly fire attacks by team 1")
-    team1_battle_ratio: float | None = SQLField(default=None, description="Battle ratio for team 1 (0.0-100.0)")
-    team1_avg_points: float | None = SQLField(default=None, description="Average points per user for team 1")
-    team1_avg_attacks: float | None = SQLField(default=None, description="Average attacks per user for team 1")
-    
-    team2_users: int | None = SQLField(default=None, description="Number of users on team 2")
-    team2_attacks: int | None = SQLField(default=None, description="Number of attacks by team 2")
-    team2_friendly_fire: int | None = SQLField(default=None, description="Number of friendly fire attacks by team 2")
-    team2_battle_ratio: float | None = SQLField(default=None, description="Battle ratio for team 2 (0.0-100.0)")
-    team2_avg_points: float | None = SQLField(default=None, description="Average points per user for team 2")
-    team2_avg_attacks: float | None = SQLField(default=None, description="Average attacks per user for team 2")
+
+    def get_team_data(self) -> dict:
+        """Parse the team_data JSON blob into a dict."""
+        import json
+        try:
+            return json.loads(self.team_data) if self.team_data else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def set_team_data(self, data: dict) -> None:
+        """Serialize a dict of per-team data into the team_data column."""
+        import json
+        self.team_data = json.dumps(data)
+
+    def percentages(self) -> dict[str, float]:
+        """Return {team_key: percentage} for all teams that have a percentage."""
+        return {
+            key: team["percentage"]
+            for key, team in self.get_team_data().items()
+            if team.get("percentage") is not None
+        }
+
+    def team_metric(self, team_key: str, metric: str):
+        """Get a single metric (users, attacks, friendly_fire, battle_ratio, avg_points, avg_attacks) for a team."""
+        return self.get_team_data().get(team_key, {}).get(metric)
+
+    def compute_leader_key(self) -> str | None:
+        """Determine the config key of the team with the highest percentage."""
+        percentages = self.percentages()
+        if not percentages:
+            return None
+        return max(percentages, key=lambda k: percentages[k])
+
+    def _team_display_names(self) -> dict[str, str]:
+        """Map team config key -> display name, falling back to the key itself."""
+        from .config import settings
+        names = {}
+        for key in self.get_team_data().keys():
+            if settings.teams is not None:
+                try:
+                    names[key] = settings.teams[key].name
+                except (KeyError, AttributeError):
+                    names[key] = key
+            else:
+                names[key] = key
+        return names
+
+    def _team_image(self, team_key: str) -> str | None:
+        from .config import settings
+        if settings.teams is not None:
+            try:
+                return settings.teams[team_key].image_url
+            except (KeyError, AttributeError):
+                return None
+        return None
 
     def to_atom_item(self) -> dict:
         """Convert to Atom item format."""
-        team1_name = "Team 1"
-        team2_name = "Team 2"
-        team1_image = None
-        team2_image = None
+        team_data = self.get_team_data()
+        names = self._team_display_names()
+        leader_key = self.leader_key or self.compute_leader_key()
+        leader_name = names.get(leader_key, leader_key) if leader_key else "Unknown"
+        leader_image = self._team_image(leader_key) if leader_key else None
 
-        # Get team names and images from config if available
-        from .config import settings
-        if settings.teams:
-            team1_name = settings.teams.team1.name
-            team2_name = settings.teams.team2.name
-            team1_image = settings.teams.team1.image_url
-            team2_image = settings.teams.team2.image_url
-
-        leader_image = team1_image if self.team1_percentage > 50 else team2_image
-        
-        # Build description with team metrics if available
         description_parts = []
-        
+
         if self.leader_change:
-            leader = team1_name if self.team1_percentage > 50 else team2_name
-            title = f"Leader Change: {leader} takes the lead!"
-            description_parts.append(f"**{team1_name}**: {self.team1_percentage:.5f}%")
-            description_parts.append(f"**{team2_name}**: {100-self.team1_percentage:.5f}%")
+            title = f"Leader Change: {leader_name} takes the lead!"
         else:
             title = "Team Standings Update"
-            description_parts.append(f"**{team1_name}**: {self.team1_percentage:.5f}%")
-            description_parts.append(f"**{team2_name}**: {100-self.team1_percentage:.5f}%")
-        
-        # Add detailed metrics if available
-        if any([self.team1_users, self.team1_attacks, self.team1_friendly_fire, 
-                self.team2_users, self.team2_attacks, self.team2_friendly_fire]):
-            description_parts.append("")  # Empty line for spacing
+
+        for key, team in team_data.items():
+            percentage = team.get("percentage")
+            if percentage is not None:
+                description_parts.append(f"**{names.get(key, key)}**: {percentage:.5f}%")
+
+        # Add detailed metrics if any team has them
+        metric_specs = [
+            ("users", "Users", "{:,}"),
+            ("attacks", "Attacks", "{:,}"),
+            ("friendly_fire", "Friendly Fire", "{:,}"),
+            ("battle_ratio", "Battle Ratio", "{:.2f}%"),
+            ("avg_points", "Avg Points", "{:.2f}"),
+            ("avg_attacks", "Avg Attacks", "{:.2f}"),
+        ]
+        has_metrics = any(
+            team.get(metric_key) is not None
+            for team in team_data.values()
+            for metric_key, _, _ in metric_specs
+        )
+        if has_metrics:
+            description_parts.append("")
             description_parts.append("**Detailed Metrics:**")
-            
-            if self.team1_users and self.team2_users:
-                description_parts.append(f"**Users**: {team1_name}: {self.team1_users:,}, {team2_name}: {self.team2_users:,}")
-            if self.team1_attacks and self.team2_attacks:
-                description_parts.append(f"**Attacks**: {team1_name}: {self.team1_attacks:,}, {team2_name}: {self.team2_attacks:,}")
-            if self.team1_friendly_fire and self.team2_friendly_fire:
-                description_parts.append(f"**Friendly Fire**: {team1_name}: {self.team1_friendly_fire:,}, {team2_name}: {self.team2_friendly_fire:,}")
-            if self.team1_battle_ratio and self.team2_battle_ratio:
-                description_parts.append(f"**Battle Ratio**: {team1_name}: {self.team1_battle_ratio:.2f}%, {team2_name}: {self.team2_battle_ratio:.2f}%")
-            if self.team1_avg_points and self.team2_avg_points:
-                description_parts.append(f"**Avg Points**: {team1_name}: {self.team1_avg_points:.2f}, {team2_name}: {self.team2_avg_points:.2f}")
-            if self.team1_avg_attacks and self.team2_avg_attacks:
-                description_parts.append(f"**Avg Attacks**: {team1_name}: {self.team1_avg_attacks:.2f}, {team2_name}: {self.team2_avg_attacks:.2f}")
-        
+            for metric_key, label, fmt in metric_specs:
+                values = [
+                    (names.get(key, key), team.get(metric_key))
+                    for key, team in team_data.items()
+                    if team.get(metric_key) is not None
+                ]
+                if values:
+                    formatted = ", ".join(f"{name}: {fmt.format(value)}" for name, value in values)
+                    description_parts.append(f"**{label}**: {formatted}")
+
         description = "\n".join(description_parts)
         if leader_image:
             description += f"\n\n![Image]({leader_image})"

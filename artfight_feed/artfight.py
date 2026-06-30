@@ -263,7 +263,7 @@ class ArtFightClient:
         try:
             # Try to access a page that requires authentication
             # ArtFight's profile page or dashboard would be good for this
-            test_url = urljoin(self.base_url, "/~fourleafisland/defenses")
+            test_url = urljoin(self.base_url, "/~cupidcry/defenses")
             logger.debug("Validating authentication by accessing protected page")
             self._log_request("GET", test_url, cookies=self.cookies)
 
@@ -514,18 +514,17 @@ class ArtFightClient:
                 logger.warning("Authentication failed for team standings - session cookie may be invalid")
                 return []
 
-            # Fetch event page (contains both progress bars and detailed metrics)
-            event_url = urljoin(self.base_url, "/event")
-            logger.info("Fetching team standings from event page")
-            self._log_request("GET", event_url, cookies=self.cookies)
-
-            response = await self.client.get(event_url)
-            self._log_response(response)
-            response.raise_for_status()
+            # Fetch event page (contains both progress bars and detailed metrics).
+            # Some years the /event page doesn't render the progress bar (e.g. before
+            # the event officially "starts" on that page), in which case we fall back
+            # to the homepage, which usually still shows it.
+            html_text, source_url = await self._fetch_team_standings_html()
+            if html_text is None:
+                return []
 
             # Parse team standings from the page
-            logger.debug(f"Parsing team standings from HTML (content length: {len(response.text)})")
-            standings = self._parse_team_standings_from_html(response.text)
+            logger.debug(f"Parsing team standings from HTML (source: {source_url}, content length: {len(html_text)})")
+            standings = self._parse_team_standings_from_html(html_text)
 
             # Save standings to database
             if standings:
@@ -551,6 +550,40 @@ class ArtFightClient:
             logger.error(f"Unexpected error fetching team standings: {e}")
             return []
 
+    async def _fetch_team_standings_html(self) -> tuple[str | None, str | None]:
+        """Fetch the HTML page that contains the team standings progress bar.
+
+        Tries the /event page first. If it doesn't contain a progress bar
+        (which can happen depending on event phase/year), falls back to the
+        homepage, which ArtFight also shows the standings bar on.
+
+        Returns (html, source_url) or (None, None) if neither page works.
+        """
+        candidate_paths = ["/event", "/"]
+
+        for path in candidate_paths:
+            url = urljoin(self.base_url, path)
+            logger.info(f"Fetching team standings from {path} page")
+            self._log_request("GET", url, cookies=self.cookies)
+
+            response = await self.client.get(url)
+            self._log_response(response)
+            response.raise_for_status()
+
+            if "no event scheduled" in response.text.lower():
+                logger.info("No ArtFight event currently scheduled, skipping team standings check")
+                return response.text, url
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            progress_div = soup.find("div", class_="progress")
+            if progress_div and isinstance(progress_div, Tag) and progress_div.find_all("div", class_="progress-bar"):
+                return response.text, url
+
+            logger.warning(f"No progress bar found on {path}, trying next fallback")
+
+        logger.warning("Could not find a progress bar on /event or the homepage")
+        return None, None
+
     def _parse_team_standings_from_html(self, html: str) -> list[TeamStanding]:
         """Parse team standings from HTML content."""
         soup = BeautifulSoup(html, "html.parser")
@@ -570,46 +603,59 @@ class ArtFightClient:
 
         # Find all progress bars within the main progress div
         progress_bars = progress_div.find_all("div", class_="progress-bar")
-        if not progress_bars or len(progress_bars) != 2:
-            logger.warning(f"Expected 2 progress bars, found {len(progress_bars) if progress_bars else 0}")
+        expected_team_count = settings.teams.count if settings.teams else None
+        if not progress_bars:
+            logger.warning("No progress bars found within the progress div")
             return standings
+        if expected_team_count is not None and len(progress_bars) != expected_team_count:
+            logger.warning(
+                f"Expected {expected_team_count} progress bars (from config), found {len(progress_bars)}"
+            )
 
         logger.debug(f"Found {len(progress_bars)} progress bars for team standings")
 
         # Use team colors to determine which bar corresponds to which team
-        team1_percentage = self._parse_team_percentage_by_color(progress_bars)
-        if team1_percentage is not None:
+        team_percentages = self._parse_team_percentages_by_color(progress_bars)
+        if team_percentages:
             fetched_at = datetime.now(UTC)
 
             # Parse detailed team metrics from the event page
             team_metrics = self._parse_team_metrics_from_html(html)
 
+            team_data: dict[str, dict] = {}
+            for team_key, percentage in team_percentages.items():
+                team_data[team_key] = {
+                    "percentage": percentage,
+                    **team_metrics.get(team_key, {}),
+                }
+
             standing = TeamStanding(
-                team1_percentage=team1_percentage,
                 fetched_at=fetched_at,
                 leader_change=False,  # Will be set by database logic
-                **team_metrics
             )
+            standing.set_team_data(team_data)
+            standing.leader_key = standing.compute_leader_key()
             standings.append(standing)
-            logger.debug(f"Parsed team standings: Team 1 = {team1_percentage:.2f}%, Team 2 = {100-team1_percentage:.2f}%")
+            logger.debug(f"Parsed team standings: {team_percentages}")
 
         return standings
 
-    def _parse_team_percentage_by_color(self, progress_bars) -> float | None:
-        """Parse team percentage using team colors to determine which bar is which team."""
+    def _parse_team_percentages_by_color(self, progress_bars) -> dict[str, float]:
+        """Parse each team's percentage using team colors to determine which bar is which team."""
         try:
             if not settings.teams:
-                logger.warning("No team colors configured, falling back to first bar as team1")
-                return self._parse_team1_percentage(progress_bars[0])
+                logger.warning("No team colors configured, falling back to bar order as team1, team2, ...")
+                percentages: dict[str, float] = {}
+                for i, bar in enumerate(progress_bars, start=1):
+                    width_percent = self._extract_width_percentage(bar)
+                    if width_percent is not None:
+                        percentages[f"team{i}"] = width_percent
+                return percentages
 
-            team1_color = settings.teams.team1.color
-            team2_color = settings.teams.team2.color
+            # Build a lookup of configured team colors -> team key
+            color_to_team = {team.color.lower(): key for key, team in settings.teams.items()}
 
-            logger.debug(f"Looking for team colors: Team1={team1_color}, Team2={team2_color}")
-
-            team1_percentage = None
-            team2_percentage = None
-
+            percentages = {}
             for bar in progress_bars:
                 bg_color = self._extract_background_color(bar)
                 if not bg_color:
@@ -619,29 +665,21 @@ class ArtFightClient:
                 if width_percent is None:
                     continue
 
-                # Match color to team
-                if bg_color.lower() == team1_color.lower():
-                    team1_percentage = width_percent
-                    logger.debug(f"Team1 ({settings.teams.team1.name}) percentage: {width_percent:.2f}%")
-                elif bg_color.lower() == team2_color.lower():
-                    team2_percentage = width_percent
-                    logger.debug(f"Team2 ({settings.teams.team2.name}) percentage: {width_percent:.2f}%")
+                team_key = color_to_team.get(bg_color.lower())
+                if team_key:
+                    percentages[team_key] = width_percent
+                    logger.debug(f"{team_key} ({settings.teams[team_key].name}) percentage: {width_percent:.2f}%")
                 else:
                     logger.warning(f"Unknown team color: {bg_color}")
 
-            # Return team1 percentage (the one we store in the database)
-            if team1_percentage is not None:
-                return team1_percentage
-            elif team2_percentage is not None:
-                # If we only found team2, calculate team1 percentage
-                return 100 - team2_percentage
+            if not percentages:
+                logger.warning("Could not determine any team percentages from colors")
 
-            logger.warning("Could not determine team percentages from colors")
-            return None
+            return percentages
 
         except Exception as e:
-            logger.error(f"Error parsing team percentage by color: {e}")
-            return None
+            logger.error(f"Error parsing team percentages by color: {e}")
+            return {}
 
     def _extract_background_color(self, bar_element) -> str | None:
         """Extract background color from a progress bar element."""
@@ -681,91 +719,85 @@ class ArtFightClient:
             logger.error(f"Error extracting width percentage: {e}")
             return None
 
-    def _parse_team_metrics_from_html(self, html: str) -> dict: # type: ignore
-        """Parse detailed team metrics from the event page HTML."""
+    def _parse_team_metrics_from_html(self, html: str) -> dict[str, dict]:
+        """Parse detailed team metrics from the event page HTML.
+
+        Returns a dict keyed by team config key (team1, team2, ...) mapping to a
+        dict of metric name -> value.
+        """
         soup = BeautifulSoup(html, "html.parser")
-        metrics = {
-            'team1_users': None,
-            'team2_users': None,
-            'team1_attacks': None,
-            'team2_attacks': None,
-            'team1_friendly_fire': None,
-            'team2_friendly_fire': None,
-            'team1_battle_ratio': None,
-            'team2_battle_ratio': None,
-            'team1_avg_points': None,
-            'team2_avg_points': None,
-            'team1_avg_attacks': None,
-            'team2_avg_attacks': None,
-        }
+        metrics: dict[str, dict] = {}
 
         try:
+            if not settings.teams:
+                logger.warning("No teams configured, skipping detailed team metrics parsing")
+                return metrics
+
             # Look for team statistics cards with the specific structure from the HTML
             # Structure: <div class="col-md-6"><div class="card"><div class="card-header">...</div><div class="card-body">...</div></div></div>
-            team_cards = soup.find_all("div", class_="col-md-6")
-            
+            team_cards = soup.find_all("div", class_="col-md-4")
+
             logger.debug(f"Found {len(team_cards)} potential team cards")
-            
+
             for card in team_cards:
                 # Look for the card structure
                 card_div = card.find("div", class_="card") # type: ignore
                 if not card_div:
                     continue
-                
+
                 # Find the card header with team name
                 card_header = card_div.find("div", class_="card-header") # type: ignore
                 if not card_header:
                     continue
-                
+
                 # Extract team name from the link in the header
                 # Structure: <strong><a href="/team/21.fossils">Fossils</a></strong>
                 team_link = card_header.find("a") # type: ignore
                 if not team_link:
                     continue
-                
+
                 team_name = team_link.get_text(strip=True) # type: ignore
                 if not team_name:
                     continue
-                
+
                 logger.debug(f"Found team card for: {team_name}")
-                
-                # Determine which team this is based on configured team names
-                if not settings.teams:
-                    continue
-                    
-                is_team1 = settings.teams.team1.name.lower() in team_name.lower()
-                is_team2 = settings.teams.team2.name.lower() in team_name.lower()
-                
-                if not (is_team1 or is_team2):
+
+                # Determine which configured team this card belongs to by name
+                team_key = next(
+                    (key for key, team in settings.teams.items() if team.name.lower() in team_name.lower()),
+                    None,
+                )
+                if team_key is None:
                     logger.debug(f"Team '{team_name}' not in configured teams, skipping")
                     continue
-                
-                team_prefix = "team1" if is_team1 else "team2"
-                logger.debug(f"Processing metrics for {team_prefix}: {team_name}")
-                
+
+                logger.debug(f"Processing metrics for {team_key}: {team_name}")
+
                 # Find the card body with metrics
                 card_body = card_div.find("div", class_="card-body") # type: ignore
                 if not card_body:
                     continue
-                
+
+                team_metrics: dict = {}
                 # Parse metrics from the card body
                 # Structure: <h4>272912 <small>users</small></h4>
-                self._parse_metric_from_card_body(card_body, team_prefix, "users", r'(\d+)', 'users', metrics, int)
-                self._parse_metric_from_card_body(card_body, team_prefix, "attacks", r'(\d+)', 'attacks', metrics, int)
-                self._parse_metric_from_card_body(card_body, team_prefix, "friendly fire attacks", r'(\d+)', 'friendly_fire', metrics, int)
-                self._parse_metric_from_card_body(card_body, team_prefix, "battle ratio", r'([\d.]+)', 'battle_ratio', metrics, float)
-                self._parse_metric_from_card_body(card_body, team_prefix, "average points", r'([\d.]+)', 'avg_points', metrics, float)
-                self._parse_metric_from_card_body(card_body, team_prefix, "average attacks", r'([\d.]+)', 'avg_attacks', metrics, float)
-            
+                self._parse_metric_from_card_body(card_body, "users", r'(\d+)', 'users', team_metrics, int)
+                self._parse_metric_from_card_body(card_body, "attacks", r'(\d+)', 'attacks', team_metrics, int)
+                self._parse_metric_from_card_body(card_body, "friendly fire attacks", r'(\d+)', 'friendly_fire', team_metrics, int)
+                self._parse_metric_from_card_body(card_body, "battle ratio", r'([\d.]+)', 'battle_ratio', team_metrics, float)
+                self._parse_metric_from_card_body(card_body, "average points", r'([\d.]+)', 'avg_points', team_metrics, float)
+                self._parse_metric_from_card_body(card_body, "average attacks", r'([\d.]+)', 'avg_attacks', team_metrics, float)
+                metrics[team_key] = team_metrics
+
             logger.debug(f"Parsed team metrics: {metrics}")
-            
+
         except Exception as e:
             logger.error(f"Error parsing team metrics: {e}")
-        
+
         return metrics
 
-    def _parse_metric_from_card_body(self, card_body, team_prefix: str, search_text: str, 
-                                    regex_pattern: str, metric_name: str, metrics: dict, 
+    def _parse_metric_from_card_body(self, card_body, search_text: str,
+                                    regex_pattern: str, metric_name: str, metrics: dict,
                                     value_type: type) -> None:
         """Parse a specific metric from a card body using the ArtFight HTML structure."""
         try:
@@ -782,113 +814,14 @@ class ArtFightClient:
                     match = re.search(regex_pattern, number_text)
                     if match:
                         metric_value = value_type(match.group(1))
-                        metrics[f'{team_prefix}_{metric_name}'] = metric_value
-                        logger.debug(f"Found {team_prefix}_{metric_name}: {metric_value}")
+                        metrics[metric_name] = metric_value
+                        logger.debug(f"Found {metric_name}: {metric_value}")
                         return
-            
-            logger.debug(f"Could not find {metric_name} for {team_prefix}")
-                
-        except Exception as e:
-            logger.debug(f"Error parsing {metric_name} for {team_prefix}: {e}")
 
-    def _parse_metric_from_section(self, section, team_prefix: str, search_text: str, 
-                                  regex_pattern: str, metric_name: str, metrics: dict, 
-                                  value_type: type) -> None:
-        """Helper method to parse a specific metric from a section."""
-        try:
-            # Try multiple approaches to find the metric
-            metric_value = None
-            
-            # Approach 1: Look for h4 elements with small tags (ArtFight's specific structure)
-            # This matches the structure: <h4>267217 <small>users</small></h4>
-            for h4_elem in section.find_all('h4'):
-                small_elem = h4_elem.find('small')
-                if small_elem and search_text.lower() in small_elem.get_text().lower():
-                    # Extract the number from the h4 text (before the small tag)
-                    h4_text = h4_elem.get_text()
-                    # Remove the small tag text to get just the number
-                    small_text = small_elem.get_text()
-                    number_text = h4_text.replace(small_text, '').strip()
-                    match = re.search(regex_pattern, number_text)
-                    if match:
-                        metric_value = value_type(match.group(1))
-                        break
-            
-            # Approach 2: Find text containing the metric name (fallback)
-            if metric_value is None:
-                metric_elem = section.find(text=re.compile(search_text, re.I))
-                if metric_elem and hasattr(metric_elem, 'parent') and metric_elem.parent:
-                    parent_text = metric_elem.parent.get_text()
-                    match = re.search(regex_pattern, parent_text)
-                    if match:
-                        metric_value = value_type(match.group(1))
-            
-            # Approach 3: Look for elements with data attributes or specific classes
-            if metric_value is None:
-                # Try to find elements with metric-related classes or IDs
-                for elem in section.find_all(text=True):
-                    if search_text.lower() in elem.lower():
-                        # Look for numbers in nearby elements
-                        parent = elem.parent
-                        if parent:
-                            # Check parent and siblings for numbers
-                            for sibling in [parent] + list(parent.find_next_siblings()):
-                                sibling_text = sibling.get_text()
-                                match = re.search(regex_pattern, sibling_text)
-                                if match:
-                                    metric_value = value_type(match.group(1))
-                                    break
-                        if metric_value is not None:
-                            break
-            
-            # Approach 4: Look for table rows or list items containing the metric
-            if metric_value is None:
-                for elem in section.find_all(['tr', 'li', 'div']):
-                    elem_text = elem.get_text()
-                    if search_text.lower() in elem_text.lower():
-                        match = re.search(regex_pattern, elem_text)
-                        if match:
-                            metric_value = value_type(match.group(1))
-                            break
-            
-            # Store the metric if found
-            if metric_value is not None:
-                metrics[f'{team_prefix}_{metric_name}'] = metric_value
-                logger.debug(f"Found {team_prefix}_{metric_name}: {metric_value}")
-                
-        except Exception as e:
-            logger.debug(f"Error parsing {metric_name} for {team_prefix}: {e}")
-
-    def _parse_team1_percentage(self, bar_element) -> float | None:
-        """Parse team1 percentage from the first progress bar element."""
-        try:
-            # Extract the style attribute to get width
-            style_attr = bar_element.get("style", "")
-            logger.debug(f"Parsing team1 progress bar with style: {style_attr}")
-
-            # Extract width percentage
-            width_match = re.search(r"width:([\d.]+)%", style_attr)
-            if not width_match:
-                logger.warning("No width found in progress bar style")
-                return None
-
-            width_percent = float(width_match.group(1))
-
-            # Extract percentage text from the bar content as backup
-            percentage_text = bar_element.get_text(strip=True)
-            percentage_match = re.search(r"([\d.]+)%", percentage_text)
-            if percentage_match:
-                percentage = float(percentage_match.group(1))
-                # Use the text percentage if it's close to the width percentage
-                if abs(percentage - width_percent) < 1.0:
-                    return percentage
-
-            # Return width percentage as fallback
-            return width_percent
+            logger.debug(f"Could not find {metric_name}")
 
         except Exception as e:
-            logger.error(f"Error parsing team1 percentage: {e}")
-            return None
+            logger.debug(f"Error parsing {metric_name}: {e}")
 
     async def get_news_posts(self) -> list[ArtFightNews]:
         """Fetch news posts from ArtFight."""

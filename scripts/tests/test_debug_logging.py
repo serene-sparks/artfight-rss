@@ -43,7 +43,7 @@ async def test_debug_logging():
 
     try:
         # Test with a known username
-        username = "fourleafisland"
+        username = "cupiddcry"
 
         print(f"\nTesting attacks for user: {username}")
         print("-" * 40)
